@@ -174,10 +174,135 @@ FROM `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`;
 
 
 -- -----------------------------------------------------------------------------
--- Customer type distribution — sanity check on the segmentation column
+-- Customer type distribution — sanity check on the segmentation column.
+-- Note the presence of both 'Consumo' / 'Consumer' (and 'Empresarial' /
+-- 'Business') — the English variants are a legacy encoding of the same
+-- segments. This is normalised into a 'customer_segment' view in
+-- 04_step1_review_summary.sql §3.
 -- -----------------------------------------------------------------------------
 SELECT customer_type, COUNT(*) AS n_sessions
 FROM   `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`
 GROUP  BY customer_type
 ORDER  BY n_sessions DESC
 LIMIT  50;
+
+
+-- =============================================================================
+-- ANALYTICAL BLOCKS
+-- The three queries below produce the analytical narrative for Step 1.
+-- Each has a header comment stating the question it answers and how to
+-- read the result. Ordered from headline (Block A) to diagnostic (Block C).
+-- =============================================================================
+
+
+-- -----------------------------------------------------------------------------
+-- Block A — Coverage funnel
+--
+-- Question: of all Tobi sessions in the source table, what share received
+-- an extracted intent under Step 1?
+--
+-- Result shape: one row.
+-- • total_sessions           — distinct session_id in the raw log table
+-- • sessions_with_intent     — rows in the intent output table (= 1 per session)
+-- • sessions_without_intent  — the residual, investigated in file 03
+-- • pct_coverage             — sessions_with_intent / total_sessions × 100
+--
+-- Reconciles to EDA §2 (total_sessions == n_sessions there).
+-- -----------------------------------------------------------------------------
+WITH source AS (
+  SELECT COUNT(DISTINCT session_id) AS n_sessions_total
+  FROM `vf-pt-copsvertex-live.vfpt_dh_lake_cops_pub_investigation.f_tobi_logs_vertex`
+),
+extracted AS (
+  SELECT COUNT(*) AS n_sessions_with_intent
+  FROM `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`
+)
+SELECT
+  source.n_sessions_total                                                       AS total_sessions,
+  extracted.n_sessions_with_intent                                              AS sessions_with_intent,
+  source.n_sessions_total - extracted.n_sessions_with_intent                    AS sessions_without_intent,
+  ROUND(100 * extracted.n_sessions_with_intent / source.n_sessions_total, 2)    AS pct_coverage
+FROM source, extracted;
+
+
+-- -----------------------------------------------------------------------------
+-- Block B — Extracted intents grouped by PX family
+--
+-- Question: at the PX-family level (e.g. PX36, PX36a, PX34…), which intents
+-- dominate? This is the priority list for taxonomy labelling with the Tobi
+-- team — labelling ~20 families is dramatically less effort than labelling
+-- every S_ code.
+--
+-- Result shape: top 20 rows, sorted by session count desc.
+-- • px_family      — the PX{n}{optional letter} prefix of the intent code
+-- • n_sessions     — distinct sessions whose extracted intent is in this family
+-- • pct_sessions   — share of extracted-intent sessions in this family
+-- • pct_cumulative — running total of pct_sessions; tells you "how much of
+--                    the population you cover after labelling the top N".
+-- -----------------------------------------------------------------------------
+WITH families AS (
+  SELECT REGEXP_EXTRACT(tobi_intent_log, r'^(S_PX\d+[a-z]?)') AS px_family
+  FROM `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`
+),
+counted AS (
+  SELECT px_family, COUNT(*) AS n_sessions
+  FROM families
+  GROUP BY px_family
+)
+SELECT
+  px_family,
+  n_sessions,
+  ROUND(100 * n_sessions / SUM(n_sessions) OVER (), 2)                                                          AS pct_sessions,
+  ROUND(100 * SUM(n_sessions) OVER (ORDER BY n_sessions DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+        / SUM(n_sessions) OVER (), 2)                                                                            AS pct_cumulative
+FROM counted
+ORDER BY n_sessions DESC
+LIMIT 20;
+
+
+-- -----------------------------------------------------------------------------
+-- Block C — Step-back depth distribution
+--
+-- Question: how far from the last log did the rule have to reach to find a
+-- valid intent?  Answers "is the step-back rule cosmetic (depth 1) or is it
+-- doing serious work (depth 2+)?"
+--
+-- Result shape: one row per depth value.
+-- • position_from_end — 1 = intent was the last log; 2 = one log came after
+--                        the intent; N = N-1 rows came after.
+-- • n_sessions        — distinct sessions where the intent sat at this position
+-- • pct_sessions      — share of extracted-intent sessions at this depth
+-- • pct_cumulative    — cumulative share up to and including this depth
+--
+-- Cost note: this query scans the full source log table (~412M rows).
+-- Add a `datepart` filter if the reviewer is running under a cost cap.
+-- -----------------------------------------------------------------------------
+WITH ranked_source AS (
+  SELECT
+    session_id,
+    row_id,
+    moment,
+    ROW_NUMBER() OVER (
+      PARTITION BY session_id
+      ORDER BY row_id DESC, moment DESC
+    ) AS position_from_end
+  FROM `vf-pt-copsvertex-live.vfpt_dh_lake_cops_pub_investigation.f_tobi_logs_vertex`
+),
+intent_positions AS (
+  SELECT r.position_from_end
+  FROM ranked_source r
+  INNER JOIN `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session` i
+    ON  i.session_id      = r.session_id
+    AND i.intent_row_id   = r.row_id
+    AND i.intent_moment   = r.moment
+)
+SELECT
+  position_from_end,
+  COUNT(*)                                                                                                       AS n_sessions,
+  ROUND(100 * COUNT(*) / SUM(COUNT(*)) OVER (), 2)                                                               AS pct_sessions,
+  ROUND(100 * SUM(COUNT(*)) OVER (ORDER BY position_from_end ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+        / SUM(COUNT(*)) OVER (), 2)                                                                              AS pct_cumulative
+FROM intent_positions
+GROUP BY position_from_end
+ORDER BY position_from_end
+LIMIT 30;

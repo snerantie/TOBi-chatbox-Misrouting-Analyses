@@ -54,8 +54,20 @@ ORDER  BY n_rows DESC;
 
 
 -- -----------------------------------------------------------------------------
--- 4. How often is the last log per session an excluded one?
---    This is the whole reason for the step-back rule — good to size it.
+-- 4. Last-log-class distribution — the whole justification for the step-back
+--    rule lives in this result.
+--
+--    Interpretation guide (for reviewer):
+--    • non_intent           — last log doesn't start with S_ (bot/user turns,
+--                             transfer events, session-end markers).
+--                             High share ⇒ "take the last log" would fail.
+--    • intent_candidate     — last log is a valid S_ intent, ready to use.
+--    • excluded_explicit    — last log is one of the housekeeping S_ codes
+--                             the analyst confirmed to skip.
+--    • excluded_px102_family — last log is any S_PX102* code (also skip).
+--
+--    If (excluded_explicit + excluded_px102_family + non_intent) is a
+--    meaningful share, the step-back rule is essential — not cosmetic.
 -- -----------------------------------------------------------------------------
 WITH last_log_per_session AS (
   SELECT
@@ -66,26 +78,32 @@ WITH last_log_per_session AS (
       ORDER BY row_id DESC, moment DESC
     ) AS rn_desc
   FROM `vf-pt-copsvertex-live.vfpt_dh_lake_cops_pub_investigation.f_tobi_logs_vertex`
+),
+classified AS (
+  SELECT
+    CASE
+      WHEN log IN (
+        'S_PX0_I0_E0_V0',
+        'S_PX0_I0_E0_V524',
+        'S_PX0_I0_E0_V530',
+        'S_PX103_I0_E30_V0',
+        'S_PX103_I0_E30_V615',
+        'S_PX103_I0_E33_V0',
+        'S_PX103_I1_E42_V333',
+        'S_PX103_I1_E47_V377',
+        'S_#!PX[varlubitoresult]!#'
+      )                                   THEN 'excluded_explicit'
+      WHEN STARTS_WITH(log, 'S_PX102')    THEN 'excluded_px102_family'
+      WHEN STARTS_WITH(log, 'S_')         THEN 'intent_candidate'
+      ELSE                                     'non_intent'
+    END AS last_log_class
+  FROM last_log_per_session
+  WHERE rn_desc = 1
 )
 SELECT
-  CASE
-    WHEN log IN (
-      'S_PX0_I0_E0_V0',
-      'S_PX0_I0_E0_V524',
-      'S_PX0_I0_E0_V530',
-      'S_PX103_I0_E30_V0',
-      'S_PX103_I0_E30_V615',
-      'S_PX103_I0_E33_V0',
-      'S_PX103_I1_E42_V333',
-      'S_PX103_I1_E47_V377',
-      'S_#!PX[varlubitoresult]!#'
-    )                                   THEN 'excluded_explicit'
-    WHEN STARTS_WITH(log, 'S_PX102')    THEN 'excluded_px102_family'
-    WHEN STARTS_WITH(log, 'S_')         THEN 'intent_candidate'
-    ELSE                                     'non_intent'
-  END AS last_log_class,
-  COUNT(*) AS n_sessions
-FROM   last_log_per_session
-WHERE  rn_desc = 1
-GROUP  BY last_log_class
-ORDER  BY n_sessions DESC;
+  last_log_class,
+  COUNT(*)                                                                  AS n_sessions,
+  ROUND(100 * COUNT(*) / SUM(COUNT(*)) OVER (), 2)                          AS pct_sessions
+FROM classified
+GROUP BY last_log_class
+ORDER BY n_sessions DESC;

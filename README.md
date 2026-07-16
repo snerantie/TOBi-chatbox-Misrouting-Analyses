@@ -12,8 +12,9 @@ step by step.
 ## Current scope
 
 **Step 1 only** — extract one Tobi intent per session from the raw log
-stream. Handover flag (Step 2) and ACD queue join (Step 3) come after
-Step 1 is signed off.
+stream, characterise the extracted population, and quantify the residual.
+Handover flag (Step 2) and ACD queue join (Step 3) come after Step 1 is
+signed off.
 
 ## Repository layout
 
@@ -21,22 +22,32 @@ Step 1 is signed off.
 .
 ├── README.md
 ├── docs/
-│   └── step1_intent_extraction_walkthrough.md   -- executive walkthrough
+│   ├── step1_intent_extraction_walkthrough.md   -- executive-facing walkthrough
+│   └── eda_screenshots/                          -- BigQuery result captures
 └── sql/
-    ├── 01_eda.sql                               -- schema + log distribution + exclusion sanity
-    └── 02_tobi_intent_extraction.sql            -- the extraction + 3 QA checks
+    ├── 01_eda.sql                                -- schema, volumes, log distribution
+    ├── 02_tobi_intent_extraction.sql             -- extraction + QA + analytical blocks
+    ├── 03_no_intent_investigation.sql            -- deep-dive on residual sessions
+    └── 04_step1_review_summary.sql               -- single-page review summary
 ```
 
-- **`docs/step1_intent_extraction_walkthrough.md`** — the business-facing
-  version of Step 1: what it does, why, worked example, assumptions.
-  Use this for exec / stakeholder communication.
-- **`sql/01_eda.sql`** — the exploratory queries. Run first.
-- **`sql/02_tobi_intent_extraction.sql`** — the extraction itself + 3 QA
-  checks.
+## What each file produces
 
-## Source table
+| File | Purpose | Runs against |
+|---|---|---|
+| `01_eda.sql` | Understand the raw log source: schema, volumes, log distribution, last-log-class breakdown. Justifies the step-back rule quantitatively. | `f_tobi_logs_vertex` |
+| `02_tobi_intent_extraction.sql` | Build the working table `tmp_tobi_intent_per_session`; run 4 QA checks; then produce three analytical blocks — coverage funnel, PX-family aggregation, step-back depth distribution. | `f_tobi_logs_vertex` → `tmp_tobi_intent_per_session` |
+| `03_no_intent_investigation.sql` | Build `tmp_no_intent_sessions`; characterise session length, last-log family, and — critically — overlap with transferred sessions in the extended-sessions table. | `tmp_no_intent_sessions`, `r_tobi_sessions_extended_kafka_sample` |
+| `04_step1_review_summary.sql` | Single-page Step 1 review: coverage, top PX families, normalised segment breakdown, ANI reconciliation, data-quality flags. | Reads from the tables built above. |
 
-`vf-pt-copsvertex-live.vfpt_dh_lake_cops_pub_investigation.f_tobi_logs_vertex`
+## Source and working tables
+
+| Table | Role |
+|---|---|
+| `vf-pt-copsvertex-live.vfpt_dh_lake_cops_pub_investigation.f_tobi_logs_vertex` | Source — raw Tobi log stream. |
+| `vf-pt-copsvertex-live.cops_machine_learning.r_tobi_sessions_extended_kafka_sample` | Source — one row per session; `Handover` column feeds Step 2. |
+| `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session` | Working — created by us in `02`. One row per session with the extracted intent. |
+| `vf-pt-copsvertex-live.cops_machine_learning.tmp_no_intent_sessions` | Working — created by us in `03`. Session ids with no extractable intent. |
 
 ## Extraction rule (verbatim from spec)
 
@@ -62,37 +73,50 @@ S_#!PX[varlubitoresult]!#
 + every log that starts with S_PX102
 ```
 
-Implementation is "filter first, then take last" — mathematically
+Implementation is **"filter first, then take last"** — mathematically
 identical to the step-back phrasing, expressed in one window function.
+The filter also requires `log LIKE 'S_%'` because the spec is explicit
+that the intent is the last *S_* log; EDA §4 showed ~94% of sessions end
+on a non-S_ log, so without the `S_` prefix requirement those would leak
+into the output.
 
-The filter also requires `log LIKE 'S_%'` — the spec is explicit that the
-intent is the last **S_** log. This matters because EDA §4 showed that
-~94% of sessions end on a non-S_ log (message/turn events), and without
-the `S_` prefix requirement those would leak into the output.
+## How to run (BigQuery)
 
-## How to run
+Run the files in order, each in its own query tab:
 
-1. Run `sql/01_eda.sql`. Confirm the column names in `f_tobi_logs_vertex`
-   are `session_id`, `row_id`, `moment`, `log` (adjust if not).
-2. Run `sql/02_tobi_intent_extraction.sql`. Verify the four QA checks:
-   - **QA #1** — no excluded log leaked → expected **0 rows**
-   - **QA #2** — every extracted intent starts with `S_` → expected **0 rows**
-   - **QA #3** — one row per session → expected **0 rows**
-   - **QA #4** — sessions with no extracted intent → small, explainable count
+1. **`sql/01_eda.sql`** — sanity of the source table. All four sections run
+   independently; you can skim the last-log-class section for the strongest
+   justification of the step-back rule.
+2. **`sql/02_tobi_intent_extraction.sql`** — builds the intent table and runs
+   4 QA checks plus 3 analytical blocks:
+   - **QA #1** — no excluded log leaked → expected 0
+   - **QA #2** — every extracted intent starts with `S_` → expected 0
+   - **QA #3** — one row per session → expected 0 rows
+   - **QA #4** — sessions with no extracted intent → residual, investigated in 03
+   - **Block A** — coverage funnel (one row)
+   - **Block B** — top 20 PX families with cumulative %
+   - **Block C** — step-back depth distribution
+3. **`sql/03_no_intent_investigation.sql`** — characterises the residual so
+   the reviewer can decide whether to park it (short/abandoned sessions)
+   or add a fallback rule (if the residual contains transferred customers).
+4. **`sql/04_step1_review_summary.sql`** — the single-page Step 1 review.
+   Read the header comment; each of the 5 sections has a plain-English
+   "what to conclude" comment on top of the query.
 
-Also review the two sanity queries at the bottom of the file: ANI coverage
-(how usable it is as a join key to ACD) and customer_type distribution.
+## Output columns of the intent table
 
-Output table (created by us, not read from elsewhere):
-`vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`
-
-Output columns: `session_id`, `tobi_intent_log`, `intent_row_id`,
-`intent_moment`, `ani`, `customer_type`.
+| Column | Description |
+|---|---|
+| `session_id` | Tobi session id |
+| `tobi_intent_log` | Extracted intent (last non-excluded S_ log for the session) |
+| `intent_row_id` | Row id of the intent event (for traceability) |
+| `intent_moment` | Timestamp of the intent event |
+| `ani` | Calling phone number — join key to the ACD tables in Step 3 |
+| `customer_type` | Raw customer segment; normalised in `04_step1_review_summary.sql §3` |
 
 ## Open items before Step 2
 
-- Confirm the exact column names in `f_tobi_logs_vertex` after §1 of the
-  EDA (schema query).
-- Confirm the working dataset for the output table.
-- Once QA passes, we build the handover flag from
-  `r_tobi_sessions_extended_kafka_sample.Handover`.
+- Confirm sign-off on Step 1 based on `04_step1_review_summary.sql`
+- Confirm the residual (no-intent sessions) handling: park or fallback
+- Then build Step 2 — transferred flag from
+  `r_tobi_sessions_extended_kafka_sample.Handover`
