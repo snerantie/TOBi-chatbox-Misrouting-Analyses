@@ -18,6 +18,9 @@
 --   Query 4 — Last-log prefix family (what do these sessions end on?).
 --   Query 5 — Overlap with transferred sessions from the extended-sessions
 --             table.  This is the decision-driving question.
+--   Query 6 — Diagnostic A: for the transferred no-intent (blind-spot) sessions,
+--             do the pre-computed PX / Intent columns in the extended-sessions
+--             table have values?  Confirms whether a fallback is available.
 --
 -- Run after 02_tobi_intent_extraction.sql.  Reads from the raw log table
 -- and from the extended-sessions table.
@@ -136,4 +139,53 @@ FROM      `vf-pt-copsvertex-live.cops_machine_learning.tmp_no_intent_sessions`  
 LEFT JOIN `vf-pt-copsvertex-live.cops_machine_learning.r_tobi_sessions_extended_kafka_sample`         ext
   ON ni.session_id = ext.SessionID
 GROUP BY is_transferred
+ORDER BY n_sessions DESC;
+
+
+-- -----------------------------------------------------------------------------
+-- Query 6 (Diagnostic A) — Is there a fallback intent for the blind-spot
+-- sessions in the extended-sessions table?
+--
+-- Scope: the ~1.45M sessions that (a) produced no intent under Step 1 AND
+-- (b) were transferred to an agent per `Handover` (Query 5 = TRUE bucket).
+-- For each such session, check whether the pre-computed intent columns in
+-- r_tobi_sessions_extended_kafka_sample are populated.
+--
+-- Columns checked:
+--   • ext.PX      — the PX family (e.g. PX36, PX36a)
+--   • ext.Intent  — the intent value
+--
+-- COUNT(DISTINCT ni.session_id) is used so multi-block rows in the
+-- extended-sessions table don't inflate the numbers (see the small
+-- reconciliation note on Query 5).
+--
+-- Interpretation guide:
+-- • (TRUE, TRUE)    — PX and Intent both populated for these sessions.
+--                     This is the ideal outcome: a data-supported fallback
+--                     candidate.  Still needs Diogo's confirmation on
+--                     derivation semantics before we plug it in.
+-- • (TRUE, FALSE)   — PX populated but not Intent.  Partial fallback.
+--                     PX-family may be enough for a Technical / Non-Technical
+--                     classification even without a specific intent code.
+-- • (FALSE, TRUE)   — Intent populated but not PX.  Unusual, worth flagging.
+-- • (FALSE, FALSE)  — Neither populated.  Extended table doesn't help; the
+--                     blind spot remains and Step 1 needs an explicit
+--                     fallback rule (or we accept a reduced-coverage KPI).
+--
+-- Sum of n_sessions across the four rows should be close to Query 5's
+-- TRUE count (1,453,566).  Any shortfall = sessions in the no-intent list
+-- that are entirely absent from the extended-sessions table (also worth
+-- flagging).
+-- -----------------------------------------------------------------------------
+SELECT
+  ext.PX     IS NOT NULL AND TRIM(CAST(ext.PX     AS STRING)) != ''  AS has_px_in_extended,
+  ext.Intent IS NOT NULL AND TRIM(CAST(ext.Intent AS STRING)) != ''  AS has_intent_in_extended,
+  COUNT(DISTINCT ni.session_id)                                       AS n_sessions,
+  ROUND(100 * COUNT(DISTINCT ni.session_id)
+        / SUM(COUNT(DISTINCT ni.session_id)) OVER (), 2)              AS pct_sessions
+FROM      `vf-pt-copsvertex-live.cops_machine_learning.tmp_no_intent_sessions`                        ni
+INNER JOIN `vf-pt-copsvertex-live.cops_machine_learning.r_tobi_sessions_extended_kafka_sample`        ext
+  ON ni.session_id = ext.SessionID
+WHERE ext.Handover IS NOT NULL AND TRIM(CAST(ext.Handover AS STRING)) != ''
+GROUP BY has_px_in_extended, has_intent_in_extended
 ORDER BY n_sessions DESC;
