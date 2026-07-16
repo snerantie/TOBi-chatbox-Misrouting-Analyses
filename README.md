@@ -65,14 +65,20 @@ S_#!PX[varlubitoresult]!#
 Implementation is "filter first, then take last" — mathematically
 identical to the step-back phrasing, expressed in one window function.
 
+The filter also requires `log LIKE 'S_%'` — the spec is explicit that the
+intent is the last **S_** log. This matters because EDA §4 showed that
+~94% of sessions end on a non-S_ log (message/turn events), and without
+the `S_` prefix requirement those would leak into the output.
+
 ## How to run
 
 1. Run `sql/01_eda.sql`. Confirm the column names in `f_tobi_logs_vertex`
    are `session_id`, `row_id`, `moment`, `log` (adjust if not).
-2. Run `sql/02_tobi_intent_extraction.sql`. Verify the three QA checks:
+2. Run `sql/02_tobi_intent_extraction.sql`. Verify the four QA checks:
    - **QA #1** — no excluded log leaked → expected **0 rows**
-   - **QA #2** — one row per session → expected **0 rows**
-   - **QA #3** — sessions with no extracted intent → small, explainable count
+   - **QA #2** — every extracted intent starts with `S_` → expected **0 rows**
+   - **QA #3** — one row per session → expected **0 rows**
+   - **QA #4** — sessions with no extracted intent → small, explainable count
 
 Output table:
 `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`

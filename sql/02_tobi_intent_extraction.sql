@@ -5,9 +5,13 @@
 --
 -- Rule (verbatim from the spec):
 --   • For each SESSION_ID, order the logs by ROW_ID, MOMENT.
---   • Take the LAST log in the session.
---   • If that last log is in the excluded set, step back to the previous log
---     and use that instead.  Repeat until we find a non-excluded log.
+--   • The intent is the last 'S_' log in the session.
+--   • If that last S_ log is in the excluded set, step back to the previous
+--     S_ log and use that instead.  Repeat until we find a non-excluded one.
+--
+-- Note (EDA §4): ~94% of sessions end on a non-S_ log (message/turn events),
+--   which means the step-back rule is essential — without it we'd only
+--   extract intents for ~5% of sessions.
 --
 -- Excluded logs (confirmed with the analyst):
 --   'S_PX0_I0_E0_V0'
@@ -47,7 +51,8 @@ WITH non_excluded_logs AS (
     moment,
     log
   FROM `vf-pt-copsvertex-live.vfpt_dh_lake_cops_pub_investigation.f_tobi_logs_vertex`
-  WHERE log NOT IN (
+  WHERE STARTS_WITH(log, 'S_')                         -- intents are S_ codes only
+    AND log NOT IN (
           'S_PX0_I0_E0_V0',
           'S_PX0_I0_E0_V524',
           'S_PX0_I0_E0_V530',
@@ -102,7 +107,16 @@ WHERE  tobi_intent_log IN (
 
 
 -- -----------------------------------------------------------------------------
--- QA #2 — one row per session.
+-- QA #2 — every extracted intent starts with 'S_'.
+-- Expect: 0 rows.  (Sanity check for the STARTS_WITH filter above.)
+-- -----------------------------------------------------------------------------
+SELECT COUNT(*) AS n_non_s_intents
+FROM   `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`
+WHERE  NOT STARTS_WITH(tobi_intent_log, 'S_');
+
+
+-- -----------------------------------------------------------------------------
+-- QA #3 — one row per session.
 -- Expect: 0 rows.
 -- -----------------------------------------------------------------------------
 SELECT session_id, COUNT(*) AS n
@@ -112,9 +126,11 @@ HAVING COUNT(*) > 1;
 
 
 -- -----------------------------------------------------------------------------
--- QA #3 — sessions in the raw table that have no intent extracted
--- (all their logs were excluded). Worth eyeballing to make sure the
--- exclusion list isn't wiping out anyone we actually care about.
+-- QA #4 — sessions in the raw table that have no intent extracted
+-- (every log they had was either non-S_ or on the exclusion list).
+-- We already know from EDA §4 that ~94% of sessions end on a non-S_ log,
+-- so we EXPECT most sessions to still produce an intent via step-back.
+-- This check surfaces the sessions where step-back also fails.
 -- -----------------------------------------------------------------------------
 SELECT COUNT(DISTINCT src.session_id) AS n_sessions_without_intent
 FROM   `vf-pt-copsvertex-live.vfpt_dh_lake_cops_pub_investigation.f_tobi_logs_vertex` src
