@@ -118,17 +118,22 @@ ORDER BY n_sessions DESC;
 -- transferred to a live agent?"  Answered against the Handover column
 -- in the extended-sessions table.
 --
+-- Note on join key (from schema inspection):
+--   • Extended-sessions table uses column `SessionID` (camelCase),
+--     not `session_id`. Explicit ON clause below.
+--   • Extended-sessions table also uses `Handover` (capital H).
+--
 -- • transferred = TRUE and material share ⇒ Step 1 has a blind spot;
 --   we need a fallback rule (e.g. use the T_ transfer code or the
 --   Handover value as a coarse intent).
 -- • transferred = FALSE dominates ⇒ safe to park.
 -- -----------------------------------------------------------------------------
 SELECT
-  ext.handover IS NOT NULL AND TRIM(CAST(ext.handover AS STRING)) != ''  AS is_transferred,
+  ext.Handover IS NOT NULL AND TRIM(CAST(ext.Handover AS STRING)) != ''  AS is_transferred,
   COUNT(*)                                                                AS n_sessions,
   ROUND(100 * COUNT(*) / SUM(COUNT(*)) OVER (), 2)                        AS pct_sessions
 FROM      `vf-pt-copsvertex-live.cops_machine_learning.tmp_no_intent_sessions`                        ni
 LEFT JOIN `vf-pt-copsvertex-live.cops_machine_learning.r_tobi_sessions_extended_kafka_sample`         ext
-  USING (session_id)
+  ON ni.session_id = ext.SessionID
 GROUP BY is_transferred
 ORDER BY n_sessions DESC;
