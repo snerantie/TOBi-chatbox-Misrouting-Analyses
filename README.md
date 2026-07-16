@@ -80,9 +80,14 @@ the `S_` prefix requirement those would leak into the output.
    - **QA #3** — one row per session → expected **0 rows**
    - **QA #4** — sessions with no extracted intent → small, explainable count
 
-Output table:
+Also review the two sanity queries at the bottom of the file: ANI coverage
+(how usable it is as a join key to ACD) and customer_type distribution.
+
+Output table (created by us, not read from elsewhere):
 `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`
-(rename the target if you'd rather it live elsewhere).
+
+Output columns: `session_id`, `tobi_intent_log`, `intent_row_id`,
+`intent_moment`, `ani`, `customer_type`.
 
 ## Open items before Step 2
 

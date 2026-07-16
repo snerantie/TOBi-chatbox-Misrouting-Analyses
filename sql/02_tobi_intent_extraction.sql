@@ -40,6 +40,10 @@
 --   tobi_intent_log     — the raw log string (e.g. S_PX44_I1_E18_V210)
 --   intent_row_id
 --   intent_moment
+--   ani                 — calling phone number (from the intent row)
+--                         needed as the join key to the ACD tables in Step 3.
+--   customer_type       — customer segment (from the intent row)
+--                         useful slicing dimension for downstream analysis.
 -- =============================================================================
 
 CREATE OR REPLACE TABLE `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`
@@ -49,7 +53,9 @@ WITH non_excluded_logs AS (
     session_id,
     row_id,
     moment,
-    log
+    log,
+    ani,
+    customer_type
   FROM `vf-pt-copsvertex-live.vfpt_dh_lake_cops_pub_investigation.f_tobi_logs_vertex`
   WHERE STARTS_WITH(log, 'S_')                         -- intents are S_ codes only
     AND log NOT IN (
@@ -71,6 +77,8 @@ ranked AS (
     row_id,
     moment,
     log,
+    ani,
+    customer_type,
     ROW_NUMBER() OVER (
       PARTITION BY session_id
       ORDER BY row_id DESC, moment DESC
@@ -79,9 +87,11 @@ ranked AS (
 )
 SELECT
   session_id,
-  log     AS tobi_intent_log,
-  row_id  AS intent_row_id,
-  moment  AS intent_moment
+  log            AS tobi_intent_log,
+  row_id         AS intent_row_id,
+  moment         AS intent_moment,
+  ani,
+  customer_type
 FROM ranked
 WHERE rn_desc = 1;
 
@@ -146,5 +156,28 @@ WHERE  out.session_id IS NULL;
 SELECT tobi_intent_log, COUNT(*) AS n_sessions
 FROM   `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`
 GROUP  BY tobi_intent_log
+ORDER  BY n_sessions DESC
+LIMIT  50;
+
+
+-- -----------------------------------------------------------------------------
+-- ANI coverage — how usable is it as the ACD join key?
+-- -----------------------------------------------------------------------------
+SELECT
+  COUNT(*)                                                    AS n_sessions,
+  COUNTIF(ani IS NULL OR TRIM(ani) = '')                      AS n_ani_missing,
+  SAFE_DIVIDE(
+    COUNTIF(ani IS NULL OR TRIM(ani) = ''),
+    COUNT(*)
+  )                                                           AS pct_ani_missing
+FROM `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`;
+
+
+-- -----------------------------------------------------------------------------
+-- Customer type distribution — sanity check on the segmentation column
+-- -----------------------------------------------------------------------------
+SELECT customer_type, COUNT(*) AS n_sessions
+FROM   `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`
+GROUP  BY customer_type
 ORDER  BY n_sessions DESC
 LIMIT  50;
