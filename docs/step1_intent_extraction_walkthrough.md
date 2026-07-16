@@ -55,6 +55,13 @@ If we naïvely took the very last log, we would be measuring plumbing events,
 not customer intent. So we need a rule that skips over the housekeeping
 events and lands on the last **real** intent the customer expressed.
 
+**How big is this problem?** On 16.1 million Tobi sessions we looked at,
+**~94% of conversations end on a non-intent event** (mostly bot or customer
+message turns, and session-end markers). Only about 5% end directly on a
+valid intent code, and less than 1% end on a housekeeping code we need to
+skip. Bottom line: without the step-back rule, we would produce an intent
+for only 1 in 20 conversations. **The rule is essential, not optional.**
+
 ---
 
 ## 4. The rule (in plain English)
