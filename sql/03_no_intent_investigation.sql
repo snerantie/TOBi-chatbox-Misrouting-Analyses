@@ -21,6 +21,9 @@
 --   Query 6 — Diagnostic A: for the transferred no-intent (blind-spot) sessions,
 --             do the pre-computed PX / Intent columns in the extended-sessions
 --             table have values?  Confirms whether a fallback is available.
+--   Query 7 — Distribution of PX values Diogo's fallback would return for the
+--             blind-spot sessions. Distinguishes "real intents recovered" from
+--             "housekeeping in disguise".
 --
 -- Run after 02_tobi_intent_extraction.sql.  Reads from the raw log table
 -- and from the extended-sessions table.
@@ -189,3 +192,56 @@ INNER JOIN `vf-pt-copsvertex-live.cops_machine_learning.r_tobi_sessions_extended
 WHERE ext.Handover IS NOT NULL AND TRIM(CAST(ext.Handover AS STRING)) != ''
 GROUP BY has_px_in_extended, has_intent_in_extended
 ORDER BY n_sessions DESC;
+
+
+
+-- -----------------------------------------------------------------------------
+-- Query 7 — Distribution of PX values Diogo's fallback returns for the
+-- blind-spot sessions.
+--
+-- Question: WHAT does the fallback actually contain?
+--
+-- Query 6 showed that ext.PX is populated on 100% of transferred no-intent
+-- sessions.  This query asks the second-order question: what values sit in
+-- that column?  Two very different stories are possible:
+--
+--   • If the top values are PX0, PX102, PX103 -- these are the exact
+--     housekeeping families our Step 1 rule filters out.  In this case the
+--     "fallback" is just the housekeeping code Diogo did not exclude on his
+--     side.  Not analytically usable as an intent.
+--
+--   • If the top values are the same PX families we see in our own
+--     extraction (PX36, PX36a, PX34, PX86a, PX50, PX50a, PX8, PX73, ...),
+--     the fallback is capturing real customer intents that our step-back
+--     rule missed.  Analytically valid; combine with Diogo's semantic
+--     confirmation before wiring it into the pipeline.
+--
+--   • Mixed -- judgment call and worth a Diogo conversation.
+--
+-- Output shape (top 30 rows, sorted by session count desc):
+--   • px             -- the PX value from the extended-sessions table
+--   • n_sessions     -- distinct blind-spot sessions with this PX
+--   • pct_sessions   -- share of blind-spot sessions with this PX
+--   • pct_cumulative -- running total; how much of the blind spot is
+--                       covered after taking the first N PX values
+-- -----------------------------------------------------------------------------
+WITH counted AS (
+  SELECT
+    ext.PX AS px,
+    COUNT(DISTINCT ni.session_id) AS n_sessions
+  FROM      `vf-pt-copsvertex-live.cops_machine_learning.tmp_no_intent_sessions` ni
+  INNER JOIN `vf-pt-copsvertex-live.cops_machine_learning.r_tobi_sessions_extended_kafka_sample` ext
+    ON ni.session_id = ext.SessionID
+  WHERE ext.Handover IS NOT NULL AND TRIM(CAST(ext.Handover AS STRING)) != ''
+    AND ext.PX       IS NOT NULL AND TRIM(CAST(ext.PX       AS STRING)) != ''
+  GROUP BY ext.PX
+)
+SELECT
+  px,
+  n_sessions,
+  ROUND(100 * n_sessions / SUM(n_sessions) OVER (), 2)                                                           AS pct_sessions,
+  ROUND(100 * SUM(n_sessions) OVER (ORDER BY n_sessions DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+        / SUM(n_sessions) OVER (), 2)                                                                             AS pct_cumulative
+FROM counted
+ORDER BY n_sessions DESC
+LIMIT 30;

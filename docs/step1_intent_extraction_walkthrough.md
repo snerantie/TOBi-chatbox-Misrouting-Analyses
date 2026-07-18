@@ -120,21 +120,62 @@ step at a time. **Same answer, faster.**
 
 ## 7. How we prove the output is trustworthy
 
-Three checks are built into the pipeline:
+Four checks are built into the pipeline:
 
-| Check | What it proves | Expected result |
-|---|---|---|
-| **No leakage** | None of the housekeeping events slipped through into our intent output | 0 rows |
-| **One intent per conversation** | We didn't accidentally produce duplicates | 0 rows |
-| **Coverage** | Conversations where every single event was housekeeping (so we couldn't extract any intent) | A small, explainable count |
+| Check | What it proves | Expected result | Observed |
+|---|---|---|---|
+| **No leakage** | None of the housekeeping events slipped through into our intent output | 0 rows | 0 ✅ |
+| **All intents are intent-shaped** | Every extracted intent starts with `S_` (the intent-code prefix) | 0 rows | 0 ✅ |
+| **One intent per conversation** | We didn't accidentally produce duplicates | 0 rows | 0 ✅ |
+| **Coverage** | The share of conversations where the rule successfully produced an intent | High share | 83.5% |
 
-All three checks run automatically after the extraction. If any of them
-comes back with unexpected numbers, the pipeline fails loudly rather than
-silently producing a wrong dataset.
+The first three checks are pass/fail. The fourth is a size — see §8.
 
 ---
 
-## 8. What Step 1 unlocks
+## 8. What the extraction covers, honestly
+
+On the population we tested (16.1M Tobi conversations):
+
+| Outcome | Sessions | Share |
+|---|---:|---:|
+| Intent extracted successfully | 13,479,208 | 83.5% |
+| **No intent extractable** — every log was housekeeping or a non-intent event | **2,664,087** | **16.5%** |
+
+The 16.5% residual is not "safe to park". When we cross-checked those
+sessions against the transferred-to-agent flag in the extended-sessions
+table, **54% of them were transferred to a live agent** — meaning ~1.45
+million customers made it to a human agent without our rule ever detecting
+their Tobi intent. That is ~9% of the whole Tobi population.
+
+This is a real blind spot for the misrouting KPI, and it drives the decision
+in §9.
+
+---
+
+## 9. Filling the blind spot
+
+We investigated whether the extended-sessions table's own pre-computed
+intent columns (`PX`, `Intent`) can serve as a **fallback** for the 1.45M
+blind-spot sessions. The check showed:
+
+- `PX` is populated for **100%** of the blind-spot sessions.
+- `Intent` is populated for **82.7%** of them.
+
+If those pre-computed columns are derived with a rule different enough from
+ours to survive our exclusion list, we can plug them in as a fallback for
+the residual and lift Step 1 coverage close to 100%. If instead they simply
+capture the housekeeping codes our rule filters out, they don't help and the
+blind spot stays.
+
+Diagnostic work is underway to distinguish the two cases before we commit to
+the fallback in the pipeline. The decision is out of scope for Step 1
+itself, but the blind spot is disclosed so it does not surface later as a
+surprise in the KPI.
+
+---
+
+## 10. What Step 1 unlocks
 
 Once every conversation has one clean intent attached to it, we can:
 
@@ -147,25 +188,30 @@ here.
 
 ---
 
-## 9. Assumptions and limitations, stated up front
+## 11. Assumptions and limitations, stated up front
 
-- **The housekeeping list is authoritative.** We are trusting the list
-  provided by the Tobi team. If a code that *should* be treated as
-  housekeeping is not on the list (or vice versa), it will bias the intent.
-  A periodic review of that list with the Tobi team is recommended.
+- **The housekeeping list is authoritative.** We trust the list provided by
+  the Tobi team. If a code that *should* be treated as housekeeping is not
+  on the list (or vice versa), it will bias the intent. Periodic review is
+  recommended.
+- **The 16.5% residual (2.66M sessions) has a 54% transfer rate.** This is
+  a material blind spot until a fallback is in place. Any KPI produced
+  before the fallback is applied should be reported on the 83.5% subset,
+  with the blind spot disclosed.
 - **Intent categorisation is out of scope for Step 1.** We produce the raw
   intent code per conversation. Translating that code into "Technical" vs
-  "Non-Technical" requires the official Tobi intent taxonomy, which we will
-  request before running Step 3.
+  "Non-Technical" requires the official Tobi intent taxonomy, which is
+  needed before Step 3.
 - **Data volume is a sample.** The tables used here are sample tables, not
   the full production feed. Final numbers should be produced against the
   non-sampled sources.
 
 ---
 
-## 10. Bottom line
+## 12. Bottom line
 
-Step 1 gives every Tobi conversation a single, defensible answer to the
-question *"what did this customer want?"* — after filtering out the noise of
-system and navigation events. It is the foundation on which the misrouting
-KPI will be built.
+Step 1 gives every Tobi conversation a single, defensible answer to
+*"what did this customer want?"* — for 83.5% of conversations. The
+remaining 16.5% is characterised, quantified, and its blind-spot impact on
+the misrouting KPI is disclosed rather than hidden. A fallback path using
+the extended-sessions table is under investigation.

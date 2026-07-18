@@ -134,10 +134,14 @@ WITH flags AS (
 
   UNION ALL
 
-  -- Flag: sessions with no extractable intent
+  -- Flag: sessions with no extractable intent -- material blind spot
   SELECT
-    'no_intent_sessions',
-    'Sessions where every log was non-S_ or excluded; investigated in file 03.',
+    'no_intent_sessions_blind_spot',
+    'Sessions where every log was non-S_ or excluded (~16.5% of population). '
+    || 'Cross-check in file 03 Query 5 showed 54% of these were transferred '
+    || 'to an agent -- a MATERIAL blind spot for the misrouting KPI. A '
+    || 'fallback using ext.PX / ext.Intent is under investigation (file 03 '
+    || 'Query 6 and 7).',
     CAST(
       (SELECT COUNT(DISTINCT session_id) FROM `vf-pt-copsvertex-live.vfpt_dh_lake_cops_pub_investigation.f_tobi_logs_vertex`)
       -
