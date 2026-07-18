@@ -150,6 +150,43 @@ WHERE  out.session_id IS NULL;
 
 
 -- -----------------------------------------------------------------------------
+-- Diagnostic — Exclusion completeness for the partially-excluded families
+-- (PX0 and PX103).
+--
+-- Why this query exists:
+--   The exclusion list drops specific PX0 and PX103 codes (not the whole
+--   family, unlike PX102 which is wildcarded via NOT STARTS_WITH).  Anything
+--   in these families that WASN'T listed by name in the exclusion set is
+--   allowed to survive as a valid intent.
+--
+--   This diagnostic surfaces exactly which PX0 / PX103 codes did survive,
+--   so the reviewer can confirm each one represents a real customer intent
+--   and not housekeeping we forgot to include in the exclusion list.
+--
+-- How to read the result:
+--   • Rows that look like real intents (varied I / E / V structure, healthy
+--     n_sessions across several codes)                → current exclusion is
+--                                                       complete; keep as is.
+--   • Only one or two codes with very high n_sessions → possible unlisted
+--                                                       housekeeping; widen
+--                                                       exclusion to the
+--                                                       whole family.
+--   • Empty result                                    → no PX0/PX103 codes
+--                                                       survive at all;
+--                                                       fine.
+-- -----------------------------------------------------------------------------
+SELECT
+  REGEXP_EXTRACT(tobi_intent_log, r'^(S_PX\d+)') AS px_family,
+  tobi_intent_log,
+  COUNT(*)                                        AS n_sessions
+FROM `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session`
+WHERE STARTS_WITH(tobi_intent_log, 'S_PX0_')
+   OR STARTS_WITH(tobi_intent_log, 'S_PX103')
+GROUP BY px_family, tobi_intent_log
+ORDER BY px_family, n_sessions DESC;
+
+
+-- -----------------------------------------------------------------------------
 -- Sanity peek — top extracted intents.  Not a mapping, not a taxonomy,
 -- just the raw distribution to eyeball.
 -- -----------------------------------------------------------------------------
