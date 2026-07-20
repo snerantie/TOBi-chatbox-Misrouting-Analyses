@@ -17,9 +17,11 @@ step by step.
   coverage caveat on the misrouting KPI (fallback investigation closed —
   see walkthrough §9–10).
 - **Step 2** — attach a defensible `is_transferred` flag to every Tobi
-  session. **EDA in progress** (`05_handover_eda.sql`); build query
-  (`06_handover_flag.sql`) is drafted once EDA locks the authoritative
-  handover column.
+  session. **Built.** EDA (`05_handover_eda.sql` Query 5) resolved the
+  `Handover` vs `Corrected_Handover` disagreement with data: 100% of
+  sessions Handover flagged TRANSFERED but Corrected_Handover corrected
+  to RETAINED had no ACD landing. `Corrected_Handover` is authoritative.
+  Build query is in `06_handover_flag.sql` awaiting first run + QA.
 - **Step 3** — ACD queue landing + misrouting KPI. Pending.
 
 ## Repository layout
@@ -35,7 +37,8 @@ step by step.
     ├── 02_tobi_intent_extraction.sql             -- Step 1: extraction + QA + analytical blocks
     ├── 03_no_intent_investigation.sql            -- Step 1: deep-dive on residual sessions
     ├── 04_step1_review_summary.sql               -- Step 1: single-page review summary
-    └── 05_handover_eda.sql                       -- Step 2: EDA on handover-related columns
+    ├── 05_handover_eda.sql                       -- Step 2: EDA on handover-related columns
+    └── 06_handover_flag.sql                       -- Step 2: build tmp_tobi_session_handover + QA + narrative
 ```
 
 ## What each file produces
@@ -46,7 +49,8 @@ step by step.
 | `02_tobi_intent_extraction.sql` | 1 | Build the working table `tmp_tobi_intent_per_session`; run 4 QA checks; then produce three analytical blocks — coverage funnel, PX-family aggregation, step-back depth distribution. | `f_tobi_logs_vertex` → `tmp_tobi_intent_per_session` |
 | `03_no_intent_investigation.sql` | 1 | Build `tmp_no_intent_sessions`; characterise session length, last-log family, transfer overlap, and fallback viability in the extended-sessions table. | `tmp_no_intent_sessions`, `r_tobi_sessions_extended_kafka_sample` |
 | `04_step1_review_summary.sql` | 1 | Single-page Step 1 review: coverage, top PX families, normalised segment breakdown, ANI reconciliation, data-quality flags. | Reads from the tables built above. |
-| `05_handover_eda.sql` | 2 | EDA on the handover-related columns (`Handover`, `Corrected_Handover`, `Transfered_ACD`) before we commit to an `is_transferred` rule. | `f_tobi_logs_vertex`, `r_tobi_sessions_extended_kafka_sample` |
+| `05_handover_eda.sql` | 2 | EDA on the handover-related columns (`Handover`, `Corrected_Handover`, `Transfered_ACD`) before we commit to an `is_transferred` rule. Query 5 identifies the authoritative column. | `f_tobi_logs_vertex`, `r_tobi_sessions_extended_kafka_sample` |
+| `06_handover_flag.sql` | 2 | Build the working table `tmp_tobi_session_handover` (one row per Tobi session with `is_transferred`, `handover_destination`, `skill_acd`, `has_acd_landing`); run 4 QA checks and 3 analytical blocks (coverage funnel, intent × handover cross-tab, top ACD queues). | `f_tobi_logs_vertex`, `r_tobi_sessions_extended_kafka_sample` → `tmp_tobi_session_handover` |
 
 ## Source and working tables
 
@@ -56,7 +60,7 @@ step by step.
 | `vf-pt-copsvertex-live.cops_machine_learning.r_tobi_sessions_extended_kafka_sample` | Source — one row per session (with multi-block rows in some cases); feeds Step 2 and Step 3. |
 | `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session` | Working — created by `02`. One row per session with the extracted intent. |
 | `vf-pt-copsvertex-live.cops_machine_learning.tmp_no_intent_sessions` | Working — created by `03`. Session ids with no extractable intent. |
-| `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_session_handover` | Working — will be created by `06` after Step 2 EDA locks the rule. |
+| `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_session_handover` | Working — created by `06`. One row per Tobi session with `is_transferred`, `handover_destination` (from `Corrected_Handover`), `skill_acd`, `has_acd_landing`. |
 
 ## Extraction rule (verbatim from spec)
 
@@ -114,11 +118,21 @@ is fully signed off; Step 2 (file 05) is the current work-in-progress.
    Read the header comment; each of the 5 sections has a plain-English
    "what to conclude" comment above the query.
 
-**Step 2 (in progress):**
+**Step 2:**
 
-5. **`sql/05_handover_eda.sql`** — 4 EDA queries on the handover-related
-   columns. Once the reviewer inspects these and picks the authoritative
-   column, `06_handover_flag.sql` materialises `tmp_tobi_session_handover`.
+5. **`sql/05_handover_eda.sql`** — 5 EDA queries on the handover-related
+   columns. Query 5 resolves the `Handover` vs `Corrected_Handover`
+   disagreement with data.
+6. **`sql/06_handover_flag.sql`** — builds `tmp_tobi_session_handover`
+   using `Corrected_Handover` as the authoritative signal; runs 4 QA
+   checks and 3 analytical blocks:
+   - **QA #1** — one row per session → expected 0 rows
+   - **QA #2** — output count matches source distinct sessions → equal
+   - **QA #3** — `is_transferred` distribution → ≈ 720K TRUE, 7.63M FALSE, 7.78M NULL
+   - **QA #4** — every intent-table session appears in handover table → 0 rows
+   - **Block A** — Coverage funnel from raw sessions to KPI-usable universe
+   - **Block B** — Intent × handover cross-tab (recasts the Step 1 residual against the new signal)
+   - **Block C** — Top SkillACD queues among transferred sessions (peek toward Step 3)
 
 ## Output columns of the intent table
 
@@ -142,9 +156,9 @@ is fully signed off; Step 2 (file 05) is the current work-in-progress.
 
 ## Next steps
 
-- **Now:** review `sql/05_handover_eda.sql` results; pick the authoritative
-  handover column.
-- **Then:** build `sql/06_handover_flag.sql` to materialise
-  `tmp_tobi_session_handover`.
-- **Next:** Step 3 — attach `SkillACD`, classify Technical vs Non-Technical
-  (needs queue taxonomy from Diogo), compute misrouting KPI.
+- **Now:** run `sql/06_handover_flag.sql` end-to-end; validate the 4 QA
+  checks and the 3 analytical blocks.
+- **Then:** Step 3 — classify `SkillACD` queues into Technical vs
+  Non-Technical (queue taxonomy from Diogo, or the "T suffix" heuristic
+  as a first pass) and compute the misrouting KPI on the intersection of
+  Step 1 intent and Step 2 transfer flag.
