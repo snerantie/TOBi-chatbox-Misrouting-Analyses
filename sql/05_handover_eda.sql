@@ -15,8 +15,11 @@
 --     • What values populate each — destination queue names, Yes/No,
 --       something else?
 --
---   The four queries below answer those questions with data, not
---   assumptions, before we build the flag.
+--   The five queries below answer those questions with data, not
+--   assumptions, before we build the flag. Queries 1-4 characterise the
+--   handover-related columns; Query 5 resolves the Handover vs
+--   Corrected_Handover disagreement using SkillACD as the ground-truth
+--   check for "actually reached ACD".
 --
 -- Scope: all Tobi sessions in f_tobi_logs_vertex (16.14M). The Handover
 --   flag will be attached across the whole population, including the
