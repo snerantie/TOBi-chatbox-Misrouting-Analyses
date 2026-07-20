@@ -153,29 +153,51 @@ in §9.
 
 ---
 
-## 9. Filling the blind spot
+## 9. Investigating a possible fallback — and why it does not work
 
 We investigated whether the extended-sessions table's own pre-computed
-intent columns (`PX`, `Intent`) can serve as a **fallback** for the 1.45M
-blind-spot sessions. The check showed:
+intent columns (`PX`, `Intent`) could serve as a fallback for the 1.45M
+blind-spot sessions. `PX` was populated for **100%** of them and `Intent`
+for **82.7%**, which looked promising until we checked *what* values were
+in those columns.
 
-- `PX` is populated for **100%** of the blind-spot sessions.
-- `Intent` is populated for **82.7%** of them.
+For the blind-spot sessions, the extended-sessions `PX` column returns:
 
-If those pre-computed columns are derived with a rule different enough from
-ours to survive our exclusion list, we can plug them in as a fallback for
-the residual and lift Step 1 coverage close to 100%. If instead they simply
-capture the housekeeping codes our rule filters out, they don't help and the
-blind spot stays.
+| `PX` value | Share | What it is |
+|---|---:|---|
+| PX102 | 63.0% | Family we deliberately excluded in Step 1 (wildcarded) |
+| SemLOG | 17.3% | Portuguese for "no log" — no signal at all |
+| PX0 | 14.7% | Housekeeping family (partially excluded in Step 1) |
+| PX103 | 5.0% | Housekeeping family (partially excluded in Step 1) |
 
-Diagnostic work is underway to distinguish the two cases before we commit to
-the fallback in the pipeline. The decision is out of scope for Step 1
-itself, but the blind spot is disclosed so it does not surface later as a
-surprise in the KPI.
+**~95% of the fallback values are the exact housekeeping our rule
+filters out, and ~17% is "no log at all".** The reason is that the
+extended-sessions `PX` column is computed as the *raw last log of the
+session with no exclusion filter*. For sessions where every log is
+housekeeping (which is precisely what makes them a blind spot), it
+simply re-surfaces that housekeeping.
+
+**Conclusion:** the extended-sessions `PX` column is not a usable
+fallback for the intent field. No other viable fallback signal is
+currently in scope.
+
+## 10. What we do about the blind spot
+
+We **accept the 16.5% residual** and disclose it as a coverage caveat on
+the misrouting KPI. Concretely:
+
+- All Step 1-based reporting is produced on the **83.5% subset** with an
+  extracted intent.
+- The residual (2.66M sessions, 54% of which were transferred to an agent)
+  is reported alongside the KPI with an explicit label such as
+  *"Tobi intent unavailable — excluded from misrouting rate"*.
+- Later work can revisit alternative signals in the extended-sessions
+  table (`INTENT_LIST`, `PMotivo`, `HOTLINE_REASON_CODE`) to reduce the
+  residual, but that is scoped out of the current KPI cut.
 
 ---
 
-## 10. What Step 1 unlocks
+## 11. What Step 1 unlocks
 
 Once every conversation has one clean intent attached to it, we can:
 
@@ -188,7 +210,7 @@ here.
 
 ---
 
-## 11. Assumptions and limitations, stated up front
+## 12. Assumptions and limitations, stated up front
 
 - **The housekeeping list is authoritative.** We trust the list provided by
   the Tobi team. If a code that *should* be treated as housekeeping is not
@@ -208,10 +230,11 @@ here.
 
 ---
 
-## 12. Bottom line
+## 13. Bottom line
 
 Step 1 gives every Tobi conversation a single, defensible answer to
-*"what did this customer want?"* — for 83.5% of conversations. The
-remaining 16.5% is characterised, quantified, and its blind-spot impact on
-the misrouting KPI is disclosed rather than hidden. A fallback path using
-the extended-sessions table is under investigation.
+*"what did this customer want?"* — for **83.5%** of conversations. The
+remaining **16.5%** is characterised, quantified, and disclosed as a
+coverage caveat on the misrouting KPI. A fallback via the extended-sessions
+table was investigated and found not usable; alternative signals may be
+explored in later work.
