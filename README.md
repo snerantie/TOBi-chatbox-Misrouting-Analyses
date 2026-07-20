@@ -11,10 +11,16 @@ step by step.
 
 ## Current scope
 
-**Step 1 only** — extract one Tobi intent per session from the raw log
-stream, characterise the extracted population, and quantify the residual.
-Handover flag (Step 2) and ACD queue join (Step 3) come after Step 1 is
-signed off.
+- **Step 1** — extract one Tobi intent per session, characterise the
+  extracted population, and quantify the residual. **Signed off.** Reports
+  the intent on 83.5% of sessions; the 16.5% residual is disclosed as a
+  coverage caveat on the misrouting KPI (fallback investigation closed —
+  see walkthrough §9–10).
+- **Step 2** — attach a defensible `is_transferred` flag to every Tobi
+  session. **EDA in progress** (`05_handover_eda.sql`); build query
+  (`06_handover_flag.sql`) is drafted once EDA locks the authoritative
+  handover column.
+- **Step 3** — ACD queue landing + misrouting KPI. Pending.
 
 ## Repository layout
 
@@ -25,29 +31,32 @@ signed off.
 │   ├── step1_intent_extraction_walkthrough.md   -- executive-facing walkthrough
 │   └── eda_screenshots/                          -- BigQuery result captures
 └── sql/
-    ├── 01_eda.sql                                -- schema, volumes, log distribution
-    ├── 02_tobi_intent_extraction.sql             -- extraction + QA + analytical blocks
-    ├── 03_no_intent_investigation.sql            -- deep-dive on residual sessions
-    └── 04_step1_review_summary.sql               -- single-page review summary
+    ├── 01_eda.sql                                -- Step 1: schema, volumes, log distribution
+    ├── 02_tobi_intent_extraction.sql             -- Step 1: extraction + QA + analytical blocks
+    ├── 03_no_intent_investigation.sql            -- Step 1: deep-dive on residual sessions
+    ├── 04_step1_review_summary.sql               -- Step 1: single-page review summary
+    └── 05_handover_eda.sql                       -- Step 2: EDA on handover-related columns
 ```
 
 ## What each file produces
 
-| File | Purpose | Runs against |
-|---|---|---|
-| `01_eda.sql` | Understand the raw log source: schema, volumes, log distribution, last-log-class breakdown. Justifies the step-back rule quantitatively. | `f_tobi_logs_vertex` |
-| `02_tobi_intent_extraction.sql` | Build the working table `tmp_tobi_intent_per_session`; run 4 QA checks; then produce three analytical blocks — coverage funnel, PX-family aggregation, step-back depth distribution. | `f_tobi_logs_vertex` → `tmp_tobi_intent_per_session` |
-| `03_no_intent_investigation.sql` | Build `tmp_no_intent_sessions`; characterise session length, last-log family, and — critically — overlap with transferred sessions in the extended-sessions table. | `tmp_no_intent_sessions`, `r_tobi_sessions_extended_kafka_sample` |
-| `04_step1_review_summary.sql` | Single-page Step 1 review: coverage, top PX families, normalised segment breakdown, ANI reconciliation, data-quality flags. | Reads from the tables built above. |
+| File | Step | Purpose | Runs against |
+|---|---|---|---|
+| `01_eda.sql` | 1 | Understand the raw log source: schema, volumes, log distribution, last-log-class breakdown. Justifies the step-back rule quantitatively. | `f_tobi_logs_vertex` |
+| `02_tobi_intent_extraction.sql` | 1 | Build the working table `tmp_tobi_intent_per_session`; run 4 QA checks; then produce three analytical blocks — coverage funnel, PX-family aggregation, step-back depth distribution. | `f_tobi_logs_vertex` → `tmp_tobi_intent_per_session` |
+| `03_no_intent_investigation.sql` | 1 | Build `tmp_no_intent_sessions`; characterise session length, last-log family, transfer overlap, and fallback viability in the extended-sessions table. | `tmp_no_intent_sessions`, `r_tobi_sessions_extended_kafka_sample` |
+| `04_step1_review_summary.sql` | 1 | Single-page Step 1 review: coverage, top PX families, normalised segment breakdown, ANI reconciliation, data-quality flags. | Reads from the tables built above. |
+| `05_handover_eda.sql` | 2 | EDA on the handover-related columns (`Handover`, `Corrected_Handover`, `Transfered_ACD`) before we commit to an `is_transferred` rule. | `f_tobi_logs_vertex`, `r_tobi_sessions_extended_kafka_sample` |
 
 ## Source and working tables
 
 | Table | Role |
 |---|---|
 | `vf-pt-copsvertex-live.vfpt_dh_lake_cops_pub_investigation.f_tobi_logs_vertex` | Source — raw Tobi log stream. |
-| `vf-pt-copsvertex-live.cops_machine_learning.r_tobi_sessions_extended_kafka_sample` | Source — one row per session; `Handover` column feeds Step 2. |
-| `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session` | Working — created by us in `02`. One row per session with the extracted intent. |
-| `vf-pt-copsvertex-live.cops_machine_learning.tmp_no_intent_sessions` | Working — created by us in `03`. Session ids with no extractable intent. |
+| `vf-pt-copsvertex-live.cops_machine_learning.r_tobi_sessions_extended_kafka_sample` | Source — one row per session (with multi-block rows in some cases); feeds Step 2 and Step 3. |
+| `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_intent_per_session` | Working — created by `02`. One row per session with the extracted intent. |
+| `vf-pt-copsvertex-live.cops_machine_learning.tmp_no_intent_sessions` | Working — created by `03`. Session ids with no extractable intent. |
+| `vf-pt-copsvertex-live.cops_machine_learning.tmp_tobi_session_handover` | Working — will be created by `06` after Step 2 EDA locks the rule. |
 
 ## Extraction rule (verbatim from spec)
 
@@ -82,13 +91,16 @@ into the output.
 
 ## How to run (BigQuery)
 
-Run the files in order, each in its own query tab:
+Run the files in order, each in its own query tab. Step 1 (files 01–04)
+is fully signed off; Step 2 (file 05) is the current work-in-progress.
 
-1. **`sql/01_eda.sql`** — sanity of the source table. All four sections run
-   independently; you can skim the last-log-class section for the strongest
-   justification of the step-back rule.
-2. **`sql/02_tobi_intent_extraction.sql`** — builds the intent table and runs
-   4 QA checks plus 3 analytical blocks:
+**Step 1:**
+
+1. **`sql/01_eda.sql`** — sanity of the source table. All four sections
+   run independently; the last-log-class section is the strongest
+   justification for the step-back rule.
+2. **`sql/02_tobi_intent_extraction.sql`** — builds the intent table
+   and runs 4 QA checks plus 3 analytical blocks:
    - **QA #1** — no excluded log leaked → expected 0
    - **QA #2** — every extracted intent starts with `S_` → expected 0
    - **QA #3** — one row per session → expected 0 rows
@@ -96,12 +108,17 @@ Run the files in order, each in its own query tab:
    - **Block A** — coverage funnel (one row)
    - **Block B** — top 20 PX families with cumulative %
    - **Block C** — step-back depth distribution
-3. **`sql/03_no_intent_investigation.sql`** — characterises the residual so
-   the reviewer can decide whether to park it (short/abandoned sessions)
-   or add a fallback rule (if the residual contains transferred customers).
+3. **`sql/03_no_intent_investigation.sql`** — 7 queries characterising
+   the residual, including the fallback investigation (Queries 6–7).
 4. **`sql/04_step1_review_summary.sql`** — the single-page Step 1 review.
    Read the header comment; each of the 5 sections has a plain-English
-   "what to conclude" comment on top of the query.
+   "what to conclude" comment above the query.
+
+**Step 2 (in progress):**
+
+5. **`sql/05_handover_eda.sql`** — 4 EDA queries on the handover-related
+   columns. Once the reviewer inspects these and picks the authoritative
+   column, `06_handover_flag.sql` materialises `tmp_tobi_session_handover`.
 
 ## Output columns of the intent table
 
@@ -114,9 +131,20 @@ Run the files in order, each in its own query tab:
 | `ani` | Calling phone number — join key to the ACD tables in Step 3 |
 | `customer_type` | Raw customer segment; normalised in `04_step1_review_summary.sql §3` |
 
-## Open items before Step 2
+## Step 1 outcome, summarised
 
-- Confirm sign-off on Step 1 based on `04_step1_review_summary.sql`
-- Confirm the residual (no-intent sessions) handling: park or fallback
-- Then build Step 2 — transferred flag from
-  `r_tobi_sessions_extended_kafka_sample.Handover`
+- ✅ Intent extracted for **83.5%** of Tobi sessions (13.48M of 16.14M).
+- ⚠ **16.5%** residual (2.66M sessions); 54% of the residual were transferred
+  to an agent — a coverage caveat, not a bug.
+- ❌ Extended-sessions `PX` column is not a usable fallback (verified via
+  `03_no_intent_investigation.sql` Query 7). Decision: report the KPI on
+  the 83.5% subset with an explicit *"Tobi intent unavailable"* bucket.
+
+## Next steps
+
+- **Now:** review `sql/05_handover_eda.sql` results; pick the authoritative
+  handover column.
+- **Then:** build `sql/06_handover_flag.sql` to materialise
+  `tmp_tobi_session_handover`.
+- **Next:** Step 3 — attach `SkillACD`, classify Technical vs Non-Technical
+  (needs queue taxonomy from Diogo), compute misrouting KPI.
