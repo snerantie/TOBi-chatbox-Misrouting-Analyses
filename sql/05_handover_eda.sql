@@ -196,3 +196,59 @@ FROM per_session
 GROUP BY handover_value, skill_acd_value
 ORDER BY n_sessions DESC
 LIMIT 100;
+
+
+
+-- -----------------------------------------------------------------------------
+-- Query 5 — Handover VALUE x Corrected_Handover VALUE x SkillACD alignment
+--
+-- Why this query exists:
+--   Query 2a showed Handover = TRANSFERED on 2.65M sessions (30.7%).
+--   Query 2b showed Corrected_Handover = TRANSFERED on only 0.72M sessions (8.6%).
+--   Query 4 showed 87% of Handover = TRANSFERED sessions have NO SkillACD.
+--
+--   The two columns disagree on ~1.93M sessions. This query resolves the
+--   disagreement with data by checking: for each combination of Handover
+--   value and Corrected_Handover value, what share has SkillACD populated
+--   (i.e. actually landed at an ACD queue)?
+--
+--   The column whose TRANSFERED value has a high SkillACD-populated rate is
+--   the ground-truth "actually transferred" signal.
+--
+-- Reading the result:
+--   • (TRANSFERED, TRANSFERED)  with high pct_with_skill_acd
+--       Both columns agree; these are real transfers that landed at ACD.
+--   • (TRANSFERED, RETAINED)    with low pct_with_skill_acd
+--       Handover said transferred but Corrected_Handover said retained AND
+--       there is no ACD queue landing. Corrected_Handover is right.
+--       Conclusion: Corrected_Handover is the authoritative signal.
+--   • (TRANSFERED, RETAINED)    with high pct_with_skill_acd
+--       Correction is discarding real transfers. Escalate to Diogo -- this
+--       would mean Corrected_Handover is too aggressive.
+--   • (RETAINED, TRANSFERED)    with any pct_with_skill_acd
+--       Rare inverse case; correction is upgrading retention to transfer.
+--       Investigate case-by-case.
+--
+-- Output shape: one row per (Handover value, Corrected_Handover value)
+-- combination that appears in the data, sorted by session count.
+-- -----------------------------------------------------------------------------
+WITH per_session AS (
+  SELECT
+    SessionID,
+    ANY_VALUE(Handover)                                                                                 AS h_val,
+    ANY_VALUE(Corrected_Handover)                                                                       AS ch_val,
+    MAX(IF(SkillACD IS NOT NULL AND TRIM(CAST(SkillACD AS STRING)) != '', 1, 0))                        AS has_skill_acd
+  FROM `vf-pt-copsvertex-live.cops_machine_learning.r_tobi_sessions_extended_kafka_sample`
+  WHERE Handover           IS NOT NULL AND TRIM(CAST(Handover           AS STRING)) != ''
+    AND Corrected_Handover IS NOT NULL AND TRIM(CAST(Corrected_Handover AS STRING)) != ''
+  GROUP BY SessionID
+)
+SELECT
+  h_val                                                                                                  AS handover_value,
+  ch_val                                                                                                 AS corrected_handover_value,
+  COUNT(*)                                                                                               AS n_sessions,
+  SUM(has_skill_acd)                                                                                     AS n_with_skill_acd,
+  ROUND(100 * SUM(has_skill_acd) / COUNT(*), 2)                                                          AS pct_with_skill_acd
+FROM per_session
+GROUP BY h_val, ch_val
+ORDER BY n_sessions DESC;
