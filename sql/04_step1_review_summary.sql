@@ -134,6 +134,19 @@ WITH flags AS (
 
   UNION ALL
 
+  -- Flag: sample coverage window (fixed snapshot, not live)
+  SELECT
+    'sample_time_window',
+    'r_tobi_sessions_extended_kafka_sample is a fixed snapshot covering '
+    || '17-Jul-2025 to 20-Jul-2026 (confirmed with Diogo). Sessions in the '
+    || 'raw Tobi log stream logged outside this window have no counterpart '
+    || 'in the sample by construction; explains ~47% of tmp_tobi_session_handover '
+    || 'NULLs. Not a data-quality issue -- productionising on non-sampled '
+    || 'sources removes the coverage gap.',
+    CAST(NULL AS STRING)
+
+  UNION ALL
+
   -- Flag: sessions with no extractable intent -- material blind spot
   SELECT
     'no_intent_sessions_blind_spot',

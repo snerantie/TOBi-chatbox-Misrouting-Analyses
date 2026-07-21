@@ -224,9 +224,13 @@ here.
   intent code per conversation. Translating that code into "Technical" vs
   "Non-Technical" requires the official Tobi intent taxonomy, which is
   needed before Step 3.
-- **Data volume is a sample.** The tables used here are sample tables, not
-  the full production feed. Final numbers should be produced against the
-  non-sampled sources.
+- **The sample is a fixed snapshot, 17 July 2025 – 20 July 2026** (~369
+  days). Sessions in the raw Tobi log stream logged outside this window
+  have no counterpart in the extended-sessions sample by construction —
+  that explains why ~47% of sessions in `f_tobi_logs_vertex` appear as
+  NULL in `tmp_tobi_session_handover`. When productionised on the
+  non-sampled equivalents, the SQL translates one-for-one and the
+  coverage gap closes.
 
 ---
 

@@ -45,7 +45,10 @@ step by step.
     ├── 04_step1_review_summary.sql               -- Step 1: single-page review summary
     ├── 05_handover_eda.sql                       -- Step 2: EDA on handover-related columns
     ├── 06_handover_flag.sql                       -- Step 2: build tmp_tobi_session_handover + QA + narrative
-    └── 07_acd_eda.sql                             -- Step 3: schema-first EDA on the ACD source
+    ├── 07_acd_eda.sql                             -- Step 3: schema-first EDA on the ACD source (+ sample time-range check)
+    ├── 08_acd_intent_extraction.sql               -- Step 3: build tmp_acd_intent_per_session (planned)
+    ├── 09_misrouting_kpi.sql                      -- Step 3: join + both misroute flags + KPI (planned)
+    └── 10_misrouting_why_analysis.sql             -- Step 3: diagnostic slicing to explain the "why" (planned)
 ```
 
 ## What each file produces
@@ -58,7 +61,10 @@ step by step.
 | `04_step1_review_summary.sql` | 1 | Single-page Step 1 review: coverage, top PX families, normalised segment breakdown, ANI reconciliation, data-quality flags. | Reads from the tables built above. |
 | `05_handover_eda.sql` | 2 | EDA on the handover-related columns (`Handover`, `Corrected_Handover`, `Transfered_ACD`) before we commit to an `is_transferred` rule. Query 5 identifies the authoritative column. | `f_tobi_logs_vertex`, `r_tobi_sessions_extended_kafka_sample` |
 | `06_handover_flag.sql` | 2 | Build the working table `tmp_tobi_session_handover` (one row per Tobi session with `is_transferred`, `handover_destination`, `skill_acd`, `has_acd_landing`); run 4 QA checks and 3 analytical blocks (coverage funnel, intent × handover cross-tab, top ACD queues). | `f_tobi_logs_vertex`, `r_tobi_sessions_extended_kafka_sample` → `tmp_tobi_session_handover` |
-| `07_acd_eda.sql` | 3 | Schema-first EDA on the ACD source table (`r_cops_queue_and_interaction_all_sample`) before we commit to the "first PX per session" extraction rule. Sections 2–4 are added in a follow-up commit once the schema is confirmed. | `r_cops_queue_and_interaction_all_sample` |
+| `07_acd_eda.sql` | 3 | Section 1: schema of the ACD source table. Section 2: cross-table time-range verification (confirms the 17-Jul-2025 to 20-Jul-2026 sample window from Diogo). Sections 3-5 (volumes, intent distribution, first-row class buckets) come in a follow-up commit once the ACD schema is confirmed. | `r_cops_queue_and_interaction_all_sample`, `r_tobi_sessions_extended_kafka_sample`, `f_tobi_logs_vertex` |
+| `08_acd_intent_extraction.sql` | 3 | *(planned)* Build `tmp_acd_intent_per_session` — one row per ACD session with the first PX intent (mirror of Step 1's last S_ rule, reversed direction). Depends on the ACD schema from file 07. | `r_cops_queue_and_interaction_all_sample` → `tmp_acd_intent_per_session` |
+| `09_misrouting_kpi.sql` | 3 | *(planned)* Join TOBi intent + transfer flag + ACD intent, filter to `is_transferred = TRUE`, compute both `is_misroute_strict` and `is_misroute_family`. Includes the coverage funnel and the headline KPI. | The three `tmp_*` tables |
+| `10_misrouting_why_analysis.sql` | 3 | *(planned)* Diagnostic slicing to help business answer *why* misrouting happens. Segmentation dimensions (customer_type, session length, time of day, identification status), intent dimensions (top misrouting PX families, top misrouting queues, PX-family × PX-family confusion matrix), and channel/context dimensions. | Working tables + `r_tobi_sessions_extended_kafka_sample` (for contextual attributes) |
 
 ## Source and working tables
 
@@ -164,24 +170,43 @@ is fully signed off; Step 2 (file 05) is the current work-in-progress.
 
 ## Next steps
 
-- **Now:** run Section 1 of `sql/07_acd_eda.sql` and share the schema
-  output. It sets up the join key, ordering column, and intent column
-  for the ACD-side extraction.
-- **Then:** follow-up commit adds Sections 2–4 (volumes, intent-value
-  distribution, first-row class buckets) with the confirmed column
-  names.
-- **Then:** `08_acd_intent_extraction.sql` builds `tmp_acd_intent_per_session`
-  (first PX per session) — mirror of `02_tobi_intent_extraction.sql`
-  reversed.
-- **Then:** `09_misrouting_kpi.sql` joins TOBi intent + transfer flag +
-  ACD intent, filters to `is_transferred = TRUE`, and computes the
-  misrouting rate at **exact 4-part code** match granularity (per
-  Diogo).
+- **Now:** run `sql/07_acd_eda.sql` — both sections 1 (schema) and 2
+  (sample time-range verification). Share the schema output so Sections
+  3-5 and file 08 can be written against real column names.
+- **Then:** `sql/08_acd_intent_extraction.sql` builds
+  `tmp_acd_intent_per_session` (first PX per session) — mirror of
+  `02_tobi_intent_extraction.sql`, direction reversed.
+- **Then:** `sql/09_misrouting_kpi.sql` joins TOBi intent + transfer
+  flag + ACD intent, filters to `is_transferred = TRUE`, and computes
+  both `is_misroute_strict` and `is_misroute_family`.
+- **Then:** `sql/10_misrouting_why_analysis.sql` produces the diagnostic
+  slicing views (who / which intent / which channel) so business can
+  answer *why* misrouting happens, not just *how much*.
 
 ### Note on match granularity
 
-Diogo confirmed the misroute rule is a **strict exact-code match**
-(e.g. `S_PX36_I8_E7_V147 == S_PX36_I8_E7_V147`). Any difference in the
-I / E / V components counts as a misroute, even within the same PX
-family. This will produce a higher misroute rate than a PX-family
-comparison would; that framing needs to be explicit in the report.
+After a follow-up conversation, the lead was open to either a strict
+exact-code match or a PX-family match, and asked us to make the call.
+**We compute both** and report both. Every session in the misrouting
+output carries two flags:
+
+- `is_misroute_strict` — Tobi's 4-part code ≠ ACD's 4-part code.
+- `is_misroute_family` — Tobi's PX family ≠ ACD's PX family.
+
+The strict view will produce a higher misroute rate than the family
+view; both are defensible and useful. Reporting both lets us tell the
+story at both levels.
+
+### Confirmed inputs from the lead
+
+The following are confirmed and locked into the pipeline:
+
+- **T suffix on `SkillACD` = *Técnica* (Technical).** The queue
+  classifier for the secondary "where did misrouted traffic land"
+  view is `SkillACD LIKE '% T'`.
+- **The sample date range is 17 July 2025 – 20 July 2026** — a fixed
+  snapshot. Explains the ~47% of Tobi sessions absent from the
+  extended-sessions table (they fall outside this window).
+- **The KPI must also explain the *why*.** Not just how much
+  misrouting happens, but which segments / channels / intents drive
+  it. Handled in a dedicated file 10 — see below.
