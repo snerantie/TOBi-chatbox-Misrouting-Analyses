@@ -22,7 +22,13 @@ step by step.
   sessions Handover flagged TRANSFERED but Corrected_Handover corrected
   to RETAINED had no ACD landing. `Corrected_Handover` is authoritative.
   Build query is in `06_handover_flag.sql` awaiting first run + QA.
-- **Step 3** — ACD queue landing + misrouting KPI. Pending.
+- **Step 3** — ACD-side intent extraction + misrouting KPI. **EDA starting**
+  (`07_acd_eda.sql`). Method (per Diogo): mirror of Step 1 — extract the
+  **first** `PX` intent per session from
+  `r_cops_queue_and_interaction_all_sample` (opposite direction to
+  Step 1's "last `S_`"). Compare TOBi intent vs ACD intent on the
+  transferred subset (`is_transferred = TRUE`). Match granularity:
+  **exact 4-part code** (strict).
 
 ## Repository layout
 
@@ -38,7 +44,8 @@ step by step.
     ├── 03_no_intent_investigation.sql            -- Step 1: deep-dive on residual sessions
     ├── 04_step1_review_summary.sql               -- Step 1: single-page review summary
     ├── 05_handover_eda.sql                       -- Step 2: EDA on handover-related columns
-    └── 06_handover_flag.sql                       -- Step 2: build tmp_tobi_session_handover + QA + narrative
+    ├── 06_handover_flag.sql                       -- Step 2: build tmp_tobi_session_handover + QA + narrative
+    └── 07_acd_eda.sql                             -- Step 3: schema-first EDA on the ACD source
 ```
 
 ## What each file produces
@@ -51,6 +58,7 @@ step by step.
 | `04_step1_review_summary.sql` | 1 | Single-page Step 1 review: coverage, top PX families, normalised segment breakdown, ANI reconciliation, data-quality flags. | Reads from the tables built above. |
 | `05_handover_eda.sql` | 2 | EDA on the handover-related columns (`Handover`, `Corrected_Handover`, `Transfered_ACD`) before we commit to an `is_transferred` rule. Query 5 identifies the authoritative column. | `f_tobi_logs_vertex`, `r_tobi_sessions_extended_kafka_sample` |
 | `06_handover_flag.sql` | 2 | Build the working table `tmp_tobi_session_handover` (one row per Tobi session with `is_transferred`, `handover_destination`, `skill_acd`, `has_acd_landing`); run 4 QA checks and 3 analytical blocks (coverage funnel, intent × handover cross-tab, top ACD queues). | `f_tobi_logs_vertex`, `r_tobi_sessions_extended_kafka_sample` → `tmp_tobi_session_handover` |
+| `07_acd_eda.sql` | 3 | Schema-first EDA on the ACD source table (`r_cops_queue_and_interaction_all_sample`) before we commit to the "first PX per session" extraction rule. Sections 2–4 are added in a follow-up commit once the schema is confirmed. | `r_cops_queue_and_interaction_all_sample` |
 
 ## Source and working tables
 
@@ -156,9 +164,24 @@ is fully signed off; Step 2 (file 05) is the current work-in-progress.
 
 ## Next steps
 
-- **Now:** run `sql/06_handover_flag.sql` end-to-end; validate the 4 QA
-  checks and the 3 analytical blocks.
-- **Then:** Step 3 — classify `SkillACD` queues into Technical vs
-  Non-Technical (queue taxonomy from Diogo, or the "T suffix" heuristic
-  as a first pass) and compute the misrouting KPI on the intersection of
-  Step 1 intent and Step 2 transfer flag.
+- **Now:** run Section 1 of `sql/07_acd_eda.sql` and share the schema
+  output. It sets up the join key, ordering column, and intent column
+  for the ACD-side extraction.
+- **Then:** follow-up commit adds Sections 2–4 (volumes, intent-value
+  distribution, first-row class buckets) with the confirmed column
+  names.
+- **Then:** `08_acd_intent_extraction.sql` builds `tmp_acd_intent_per_session`
+  (first PX per session) — mirror of `02_tobi_intent_extraction.sql`
+  reversed.
+- **Then:** `09_misrouting_kpi.sql` joins TOBi intent + transfer flag +
+  ACD intent, filters to `is_transferred = TRUE`, and computes the
+  misrouting rate at **exact 4-part code** match granularity (per
+  Diogo).
+
+### Note on match granularity
+
+Diogo confirmed the misroute rule is a **strict exact-code match**
+(e.g. `S_PX36_I8_E7_V147 == S_PX36_I8_E7_V147`). Any difference in the
+I / E / V components counts as a misroute, even within the same PX
+family. This will produce a higher misroute rate than a PX-family
+comparison would; that framing needs to be explicit in the report.
