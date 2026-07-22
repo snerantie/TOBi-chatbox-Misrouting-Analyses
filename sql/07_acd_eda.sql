@@ -88,3 +88,84 @@ FROM `vf-pt-copsvertex-live.vfpt_dh_lake_cops_pub_investigation.f_tobi_logs_vert
 -- add a third row to this UNION for
 -- r_cops_queue_and_interaction_all_sample so all three sources are
 -- documented in one panel.
+
+
+
+-- -----------------------------------------------------------------------------
+-- Section 3 — Volumes and px_1st coverage
+--
+-- Question: how many rows / distinct interactions in the ACD table, and
+-- what share have a first-PX intent recorded?  Also the ANI universe.
+--
+-- Reads: single-row summary.
+--   • n_rows                — total rows in the table (interaction grain).
+--   • n_distinct_interactions — distinct interactionid values.
+--   • n_distinct_anis       — distinct Final_ani values (unique phone numbers).
+--   • n_with_px_1st         — rows where px_1st is populated.
+--   • pct_with_px_1st       — % coverage of the first-PX field.
+-- -----------------------------------------------------------------------------
+SELECT
+  COUNT(*)                                                                                     AS n_rows,
+  COUNT(DISTINCT interactionid)                                                                AS n_distinct_interactions,
+  COUNT(DISTINCT Final_ani)                                                                    AS n_distinct_anis,
+  COUNTIF(px_1st IS NOT NULL AND TRIM(CAST(px_1st AS STRING)) != '')                           AS n_with_px_1st,
+  ROUND(100 * COUNTIF(px_1st IS NOT NULL AND TRIM(CAST(px_1st AS STRING)) != '') / COUNT(*), 2) AS pct_with_px_1st,
+  MIN(ulcstart_orig)                                                                            AS min_start,
+  MAX(ulcstart_orig)                                                                            AS max_start
+FROM `vf-pt-copsvertex-live.cops_machine_learning.r_cops_queue_and_interaction_all_sample`;
+
+
+-- -----------------------------------------------------------------------------
+-- Section 4 — Top values of px_1st
+--
+-- Question: what does the first-PX intent field actually contain?  Format
+-- (with or without S_ prefix?), top codes, share concentration.
+--
+-- The result also tells us whether the ACD-side codes match the shape of
+-- the Tobi-side codes (S_PXn_In_En_Vn).  If they do, the strict-match
+-- misroute rule works directly.  If the ACD side omits the S_ prefix or
+-- uses a different structure, file 09 needs a normalisation step.
+-- -----------------------------------------------------------------------------
+SELECT
+  px_1st,
+  COUNT(*)                                                                                     AS n_interactions,
+  ROUND(100 * COUNT(*) / SUM(COUNT(*)) OVER (), 2)                                             AS pct_interactions,
+  ROUND(100 * SUM(COUNT(*)) OVER (ORDER BY COUNT(*) DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+        / SUM(COUNT(*)) OVER (), 2)                                                             AS pct_cumulative
+FROM `vf-pt-copsvertex-live.cops_machine_learning.r_cops_queue_and_interaction_all_sample`
+WHERE px_1st IS NOT NULL AND TRIM(CAST(px_1st AS STRING)) != ''
+GROUP BY px_1st
+ORDER BY n_interactions DESC
+LIMIT 30;
+
+
+-- -----------------------------------------------------------------------------
+-- Section 5 — ACD-side PX-family aggregation
+--
+-- Mirror of the Tobi-side PX-family aggregation from file 02 Block B.
+-- Tells us which product families the ACD side sees most often, which is
+-- what the PX-family misroute flag in file 09 will compare against.
+--
+-- The regex tolerates both "S_PXn_..." and "PXn_..." formats (in case the
+-- ACD side omits the S_ prefix that Tobi uses).  If the top codes in
+-- Section 4 above show a completely different shape, adjust the regex.
+-- -----------------------------------------------------------------------------
+WITH families AS (
+  SELECT REGEXP_EXTRACT(px_1st, r'^(?:S_)?(PX\d+[a-z]?)') AS px_family
+  FROM `vf-pt-copsvertex-live.cops_machine_learning.r_cops_queue_and_interaction_all_sample`
+  WHERE px_1st IS NOT NULL AND TRIM(CAST(px_1st AS STRING)) != ''
+),
+counted AS (
+  SELECT px_family, COUNT(*) AS n_interactions
+  FROM families
+  GROUP BY px_family
+)
+SELECT
+  px_family,
+  n_interactions,
+  ROUND(100 * n_interactions / SUM(n_interactions) OVER (), 2)                                                                 AS pct_interactions,
+  ROUND(100 * SUM(n_interactions) OVER (ORDER BY n_interactions DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+        / SUM(n_interactions) OVER (), 2)                                                                                       AS pct_cumulative
+FROM counted
+ORDER BY n_interactions DESC
+LIMIT 20;
