@@ -64,8 +64,12 @@ WITH ranked AS (
     utcend                                                                            AS interaction_end,
     service                                                                           AS acd_service,
     ROW_NUMBER() OVER (
-      PARTITION BY interactionid
-      ORDER BY utcstart_orig ASC, atcend ASC
+      -- interactionid is FLOAT64 in the source, and BigQuery does not
+      -- allow FLOAT64 in a window PARTITION BY.  Cast to STRING (same
+      -- shape as our interaction_id output column) so the partitioning
+      -- lines up with what we'll join on downstream.
+      PARTITION BY CAST(interactionid AS STRING)
+      ORDER BY utcstart_orig ASC, utcend ASC
     )                                                                                 AS rn
   FROM `vf-pt-copsvertex-live.cops_machine_learning.r_cops_queue_and_interaction_all_sample`
   WHERE px_1st IS NOT NULL
