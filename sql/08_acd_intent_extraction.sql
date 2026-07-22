@@ -48,7 +48,10 @@ CREATE OR REPLACE TABLE `vf-pt-copsvertex-live.cops_machine_learning.tmp_acd_int
 AS
 SELECT
   CAST(interactionid AS STRING)                       AS interaction_id,
-  px_1st                                              AS acd_intent,
+  -- Normalise whitespace: the source has BOTH 'PX36' and 'PX 36' for the
+  -- same intent.  Strip all whitespace so the two encodings collapse into
+  -- a canonical 'PX36' before any join or comparison downstream.
+  REGEXP_REPLACE(CAST(px_1st AS STRING), r'\s+', '') AS acd_intent,
   Final_ani                                           AS ani,
   utcstart_orig                                       AS interaction_start,
   utcend                                              AS interaction_end,

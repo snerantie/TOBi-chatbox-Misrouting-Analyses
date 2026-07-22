@@ -151,7 +151,10 @@ LIMIT 30;
 -- Section 4 above show a completely different shape, adjust the regex.
 -- -----------------------------------------------------------------------------
 WITH families AS (
-  SELECT REGEXP_EXTRACT(px_1st, r'^(?:S_)?(PX\d+[a-z]?)') AS px_family
+  -- Normalise whitespace before extracting: the source contains BOTH
+  -- 'PX36' and 'PX 36' (with a space) as separate values.  Without the
+  -- REGEXP_REPLACE, the second form yields a NULL family (~30% of rows).
+  SELECT REGEXP_EXTRACT(REGEXP_REPLACE(px_1st, r'\s+', ''), r'^(?:S_)?(PX\d+[a-z]?)') AS px_family
   FROM `vf-pt-copsvertex-live.cops_machine_learning.r_cops_queue_and_interaction_all_sample`
   WHERE px_1st IS NOT NULL AND TRIM(CAST(px_1st AS STRING)) != ''
 ),
