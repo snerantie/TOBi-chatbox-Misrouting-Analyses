@@ -110,8 +110,8 @@ SELECT
   COUNT(DISTINCT Final_ani)                                                                    AS n_distinct_anis,
   COUNTIF(px_1st IS NOT NULL AND TRIM(CAST(px_1st AS STRING)) != '')                           AS n_with_px_1st,
   ROUND(100 * COUNTIF(px_1st IS NOT NULL AND TRIM(CAST(px_1st AS STRING)) != '') / COUNT(*), 2) AS pct_with_px_1st,
-  MIN(ulcstart_orig)                                                                            AS min_start,
-  MAX(ulcstart_orig)                                                                            AS max_start
+  MIN(utcstart_orig)                                                                            AS min_start,
+  MAX(utcstart_orig)                                                                            AS max_start
 FROM `vf-pt-copsvertex-live.cops_machine_learning.r_cops_queue_and_interaction_all_sample`;
 
 

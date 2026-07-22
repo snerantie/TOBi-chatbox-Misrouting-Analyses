@@ -50,8 +50,8 @@ SELECT
   CAST(interactionid AS STRING)                       AS interaction_id,
   px_1st                                              AS acd_intent,
   Final_ani                                           AS ani,
-  ulcstart_orig                                       AS interaction_start,
-  atcend                                              AS interaction_end,
+  utcstart_orig                                       AS interaction_start,
+  utcend                                              AS interaction_end,
   service                                             AS acd_service
 FROM `vf-pt-copsvertex-live.cops_machine_learning.r_cops_queue_and_interaction_all_sample`
 WHERE px_1st IS NOT NULL
