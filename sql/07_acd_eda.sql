@@ -172,3 +172,67 @@ SELECT
 FROM counted
 ORDER BY n_interactions DESC
 LIMIT 20;
+
+
+
+-- -----------------------------------------------------------------------------
+-- Section 6 — Interaction-id duplication diagnosis
+--
+-- On the first run of file 08's QA #1, every interactionid returned exactly
+-- 2 rows -- i.e. the source table stores each interaction twice.  Before
+-- deduplicating in file 08 we want to know WHY, so the aggregation choice
+-- (take earliest, take any, combine, ...) is defensible.
+--
+-- Query 6a lists 20 example duplicated interaction_ids alongside the
+-- number of distinct values in the columns most likely to differ between
+-- the two rows.  Reading the output:
+--   • n_distinct_px_1st = 1 across all rows → the two rows agree on the
+--     intent.  Deduplication by "earliest utcstart_orig" is safe -- both
+--     rows would contribute the same intent anyway.
+--   • n_distinct_px_1st > 1 for some rows → the two rows disagree on the
+--     intent.  Diogo's "first PX" spec applies: keep the earliest row.
+--   • n_distinct_direction = 2 → the duplication is likely inbound vs
+--     outbound / consult, or before-transfer vs after-transfer.
+--   • n_distinct_service = 2 → duplication may be queue-record vs
+--     interaction-record.  Whatever it is, it explains the pattern.
+--
+-- Query 6b summarises how many interactions have each duplicate count
+-- and how many of them have conflicting px_1st values across their rows.
+-- The user's first observation is that "each duplicate has n=2"; this
+-- query verifies that observation across the whole population.
+-- -----------------------------------------------------------------------------
+
+-- 6a — Example duplicates with fingerprint of what varies
+SELECT
+  interactionid,
+  COUNT(*)                                                                          AS n_rows,
+  COUNT(DISTINCT px_1st)                                                             AS n_distinct_px_1st,
+  COUNT(DISTINCT Final_ani)                                                          AS n_distinct_ani,
+  COUNT(DISTINCT direction)                                                          AS n_distinct_direction,
+  COUNT(DISTINCT service)                                                            AS n_distinct_service,
+  COUNT(DISTINCT utcstart_orig)                                                      AS n_distinct_start
+FROM `vf-pt-copsvertex-live.cops_machine_learning.r_cops_queue_and_interaction_all_sample`
+WHERE px_1st IS NOT NULL AND TRIM(CAST(px_1st AS STRING)) != ''
+GROUP BY interactionid
+HAVING COUNT(*) > 1
+ORDER BY n_rows DESC, interactionid
+LIMIT 20;
+
+-- 6b — Population-level summary of duplicate counts and intent conflicts
+WITH per_interaction AS (
+  SELECT
+    interactionid,
+    COUNT(*)                                                                         AS n_rows,
+    COUNT(DISTINCT REGEXP_REPLACE(CAST(px_1st AS STRING), r'\s+', ''))                AS n_distinct_px_1st
+  FROM `vf-pt-copsvertex-live.cops_machine_learning.r_cops_queue_and_interaction_all_sample`
+  WHERE px_1st IS NOT NULL AND TRIM(CAST(px_1st AS STRING)) != ''
+  GROUP BY interactionid
+)
+SELECT
+  n_rows                                                                             AS rows_per_interaction,
+  COUNT(*)                                                                           AS n_interactions,
+  SUM(IF(n_distinct_px_1st > 1, 1, 0))                                                AS n_with_conflicting_px_1st,
+  ROUND(100 * SUM(IF(n_distinct_px_1st > 1, 1, 0)) / COUNT(*), 2)                     AS pct_with_conflicting_px_1st
+FROM per_interaction
+GROUP BY rows_per_interaction
+ORDER BY rows_per_interaction;

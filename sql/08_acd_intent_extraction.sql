@@ -46,19 +46,40 @@
 
 CREATE OR REPLACE TABLE `vf-pt-copsvertex-live.cops_machine_learning.tmp_acd_intent_per_interaction`
 AS
+WITH ranked AS (
+  -- The source table stores each interaction on 2 rows (confirmed by
+  -- file 07 Section 6 -- likely inbound/outbound or before/after transfer).
+  -- We deduplicate to exactly one row per interactionid, keeping the
+  -- EARLIEST row by utcstart_orig.  This aligns with Diogo's "first PX"
+  -- discipline: even in the rare case where the two rows disagree on
+  -- px_1st, the earlier row's intent is authoritative.
+  SELECT
+    CAST(interactionid AS STRING)                                                    AS interaction_id,
+    -- Normalise whitespace: the source has BOTH 'PX36' and 'PX 36' for the
+    -- same intent.  Strip all whitespace so the two encodings collapse into
+    -- a canonical 'PX36' before any join or comparison downstream.
+    REGEXP_REPLACE(CAST(px_1st AS STRING), r'\s+', '')                               AS acd_intent,
+    Final_ani                                                                         AS ani,
+    utcstart_orig                                                                     AS interaction_start,
+    utcend                                                                            AS interaction_end,
+    service                                                                           AS acd_service,
+    ROW_NUMBER() OVER (
+      PARTITION BY interactionid
+      ORDER BY utcstart_orig ASC, atcend ASC
+    )                                                                                 AS rn
+  FROM `vf-pt-copsvertex-live.cops_machine_learning.r_cops_queue_and_interaction_all_sample`
+  WHERE px_1st IS NOT NULL
+    AND TRIM(CAST(px_1st AS STRING)) != ''
+)
 SELECT
-  CAST(interactionid AS STRING)                       AS interaction_id,
-  -- Normalise whitespace: the source has BOTH 'PX36' and 'PX 36' for the
-  -- same intent.  Strip all whitespace so the two encodings collapse into
-  -- a canonical 'PX36' before any join or comparison downstream.
-  REGEXP_REPLACE(CAST(px_1st AS STRING), r'\s+', '') AS acd_intent,
-  Final_ani                                           AS ani,
-  utcstart_orig                                       AS interaction_start,
-  utcend                                              AS interaction_end,
-  service                                             AS acd_service
-FROM `vf-pt-copsvertex-live.cops_machine_learning.r_cops_queue_and_interaction_all_sample`
-WHERE px_1st IS NOT NULL
-  AND TRIM(CAST(px_1st AS STRING)) != '';
+  interaction_id,
+  acd_intent,
+  ani,
+  interaction_start,
+  interaction_end,
+  acd_service
+FROM ranked
+WHERE rn = 1;
 
 
 -- =============================================================================
