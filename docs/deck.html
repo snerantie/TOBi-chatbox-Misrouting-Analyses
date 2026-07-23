@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TOBi ↔ ACD Misrouting Analysis — Business Review</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css">
+<style>
+:root{--brand:#e60000;--dark:#1a1a1a;--muted:#666;--good:#0a8f3c;--bad:#e60000;--warn:#f7a01d;--soft:#f6f6f6;--line:#e5e5e5;}
+.reveal{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Inter",Roboto,Arial,sans-serif;font-size:26px;color:var(--dark);}
+.reveal .slides{text-align:left;}
+.reveal h1,.reveal h2,.reveal h3{font-family:inherit;color:var(--dark);text-transform:none;margin:0 0 .35em 0;line-height:1.15;}
+.reveal h1{font-size:2.6em;font-weight:800;letter-spacing:-.01em;}
+.reveal h2{font-size:1.55em;font-weight:700;}
+.reveal h3{font-size:1.15em;font-weight:600;color:var(--muted);}
+.reveal p{margin:.35em 0;line-height:1.4;}
+.reveal .eyebrow{text-transform:uppercase;letter-spacing:.15em;font-size:.55em;color:var(--brand);font-weight:700;margin-bottom:.8em;}
+.reveal .lede{font-size:1.15em;color:var(--muted);max-width:22em;}
+.reveal .kpi-hero{font-size:8.5em;font-weight:900;letter-spacing:-.04em;line-height:1;color:var(--brand);}
+.reveal .kpi-hero small{font-size:.35em;color:var(--dark);font-weight:600;letter-spacing:0;}
+.reveal .kpi-caption{font-size:1.1em;color:var(--muted);max-width:24em;}
+.reveal table{width:100%;border-collapse:collapse;font-size:.75em;margin:.5em 0;}
+.reveal table th{text-align:left;background:var(--soft);padding:.55em .7em;font-weight:700;font-size:.9em;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--line);}
+.reveal table td{padding:.55em .7em;border-bottom:1px solid var(--line);vertical-align:middle;}
+.reveal table td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}
+.reveal .badge{display:inline-block;padding:.15em .55em;border-radius:1em;font-size:.7em;font-weight:700;}
+.reveal .badge.bad{background:#fce6e6;color:var(--bad);}
+.reveal .badge.good{background:#e2f4ea;color:var(--good);}
+.reveal .badge.warn{background:#fef3e0;color:var(--warn);}
+.reveal .cols{display:grid;grid-template-columns:1fr 1fr;gap:2em;align-items:start;}
+.reveal .cols-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5em;align-items:stretch;}
+.reveal .tile{background:var(--soft);border-radius:12px;padding:1.2em;border-left:4px solid var(--brand);}
+.reveal .tile.good{border-left-color:var(--good);}
+.reveal .tile.warn{border-left-color:var(--warn);}
+.reveal .tile h3{margin-top:0;font-size:1em;color:var(--dark);}
+.reveal .tile .n{font-size:2.1em;font-weight:800;letter-spacing:-.02em;color:var(--brand);line-height:1;margin:.15em 0;}
+.reveal .tile.good .n{color:var(--good);}
+.reveal .tile.warn .n{color:var(--warn);}
+.reveal .tile p{font-size:.85em;color:var(--muted);margin:.3em 0 0 0;}
+.reveal ul{list-style:none;padding-left:0;}
+.reveal ul li{padding:.5em 0;border-bottom:1px solid var(--line);}
+.reveal ul li::before{content:"→";color:var(--brand);margin-right:.8em;font-weight:700;}
+.reveal ol{padding-left:1.2em;}
+.reveal ol li{padding:.35em 0;}
+.reveal .step-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:.6em;margin:1em 0;}
+.reveal .step-flow .step{background:var(--soft);border-radius:8px;padding:1em .8em;text-align:center;}
+.reveal .step-flow .step .num{display:inline-block;width:1.8em;height:1.8em;line-height:1.8em;border-radius:50%;background:var(--brand);color:#fff;font-weight:800;margin-bottom:.4em;font-size:.9em;}
+.reveal .step-flow .step h3{font-size:.85em;margin:.3em 0 .15em 0;color:var(--dark);}
+.reveal .step-flow .step p{font-size:.7em;color:var(--muted);margin:0;}
+.reveal .flat-comparison{display:grid;grid-template-columns:auto 1fr auto;gap:.4em 1.2em;align-items:center;font-size:.85em;margin:.8em 0;}
+.reveal .flat-comparison .label{font-weight:600;}
+.reveal .flat-comparison .bar{height:8px;border-radius:4px;background:linear-gradient(to right,var(--warn) 74%,var(--bad) 78%);position:relative;}
+.reveal .flat-comparison .val{font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums;}
+.reveal .callout{background:#fff5f5;border:1px solid #f5c6c6;border-radius:8px;padding:1em 1.3em;margin:.8em 0;}
+.reveal .callout.good{background:#f4fbf6;border-color:#c8ecd4;}
+.reveal .callout .label{font-size:.7em;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--brand);margin-bottom:.3em;}
+.reveal .callout.good .label{color:var(--good);}
+.reveal .callout p{margin:0;font-weight:500;}
+.reveal .footer{position:absolute;bottom:.6em;left:2em;right:2em;font-size:.55em;color:var(--muted);display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:.5em;}
+.reveal .title-slide{text-align:center;padding-top:2em;}
+.reveal .title-slide h1{font-size:2.4em;margin-bottom:.3em;}
+.reveal .title-slide .sub{color:var(--muted);font-size:1.1em;}
+.reveal .title-slide .meta{margin-top:2em;color:var(--muted);font-size:.75em;}
+.reveal .bad-highlight{color:var(--bad);font-weight:800;}
+.reveal .good-highlight{color:var(--good);font-weight:800;}
+.reveal .quote-slide{padding:2em 1em;text-align:center;}
+.reveal .quote-slide .quote{font-size:1.6em;font-weight:600;line-height:1.4;max-width:20em;margin:0 auto;color:var(--dark);}
+.reveal .quote-slide .quote::before{content:"“";font-size:3em;color:var(--brand);display:block;line-height:0;margin-top:.6em;}
+.reveal section.big-number{text-align:center;}
+.reveal .versus{display:grid;grid-template-columns:1fr auto 1fr;gap:1.5em;align-items:center;margin:1em 0;}
+.reveal .versus .vs-box{background:var(--soft);border-radius:10px;padding:1.3em;text-align:center;}
+.reveal .versus .vs-box.old{border-top:4px solid var(--bad);}
+.reveal .versus .vs-box.new{border-top:4px solid var(--good);}
+.reveal .versus .vs-box .tag{font-size:.65em;text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:var(--muted);margin-bottom:.6em;}
+.reveal .versus .vs-box.old .tag{color:var(--bad);}
+.reveal .versus .vs-box.new .tag{color:var(--good);}
+.reveal .versus .vs-box p{font-weight:600;margin:0;}
+.reveal .versus .arrow{font-size:2em;color:var(--brand);font-weight:900;}
+.reveal .footnote{font-size:.6em;color:var(--muted);margin-top:1em;font-style:italic;}
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ================ SLIDE 1 : TITLE ================ -->
+<section class="title-slide">
+<div class="eyebrow">Business Review</div>
+<h1>Are We Sending Customers<br>To The Right Team?</h1>
+<p class="sub">TOBi Chatbot ↔ ACD Misrouting Analysis</p>
+<p class="meta">Data Science • Sample window 17 Jul 2025 → 20 Jul 2026</p>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 1 / 13</span></div>
+</section>
+
+<!-- ================ SLIDE 2 : THE QUESTION ================ -->
+<section>
+<div class="eyebrow">The question</div>
+<h1>When we transfer a customer<br>from Tobi to a human agent…</h1>
+<p class="lede" style="font-size:1.6em;margin-top:.6em;">…<span class="bad-highlight">do they land on the team that matches their reason for calling?</span></p>
+<p class="footnote">If they do → routing works. If they don't → we're paying a cost every time (customer waits, agent transfers again, satisfaction drops, cost per contact goes up).</p>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 2 / 13</span></div>
+</section>
+
+<!-- ================ SLIDE 3 : THE HEADLINE ================ -->
+<section class="big-number">
+<div class="eyebrow">The headline</div>
+<div class="kpi-hero">75.9%<small><br>of transferred customers are misrouted</small></div>
+<p class="kpi-caption" style="margin:1em auto;text-align:center;"><strong>235,378</strong> of <strong>310,146</strong> transferred sessions where we can measure both sides<br>land on a team whose intent classification disagrees with Tobi's.</p>
+<div class="callout" style="text-align:left;max-width:32em;margin:1em auto;"><div class="label">Say out loud</div><p>Three in every four transferred customers end up in front of a team that has classified them differently from what Tobi predicted.</p></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 3 / 13</span></div>
+</section>
+
+<!-- ================ SLIDE 4 : HOW WE MEASURED ================ -->
+<section>
+<div class="eyebrow">How we measured it — credibility</div>
+<h2>Four steps. Every number is traceable to a specific SQL query.</h2>
+<div class="step-flow">
+<div class="step"><div class="num">1</div><h3>Tobi intent</h3><p>Extract customer intent for each Tobi conversation (last valid intent log)</p></div>
+<div class="step"><div class="num">2</div><h3>Transfer flag</h3><p>Was the session transferred to an agent? (Diogo's <code>Corrected_Handover</code>, chosen by data)</p></div>
+<div class="step"><div class="num">3</div><h3>ACD intent</h3><p>What did the ACD system say the customer wanted? (first PX at agent pickup)</p></div>
+<div class="step"><div class="num">4</div><h3>Compare</h3><p>Same intent → routed correctly. Different intent → misrouted.</p></div>
+</div>
+<div class="callout good"><div class="label">Not an opinion</div><p>Two systems classify the same customer. We're just checking whether they agree.</p></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 4 / 13</span></div>
+</section>
+
+<!-- ================ SLIDE 5 : STRUCTURAL NOT SITUATIONAL ================ -->
+<section>
+<div class="eyebrow">Is it random?  No — it's structural</div>
+<h2>We sliced the 76% across every dimension. It barely moved.</h2>
+<table>
+<thead><tr><th>Slice</th><th class="num">Range of misroute rate</th><th>Interpretation</th></tr></thead>
+<tbody>
+<tr><td>Consumer vs Business</td><td class="num">75.7% – 76.1%</td><td>No difference</td></tr>
+<tr><td>Business hours (9 – 20)</td><td class="num">74.9% – 76.7%</td><td>Flat, not peak-driven</td></tr>
+<tr><td>Day of week (Mon – Sun)</td><td class="num">75.1% – 76.6%</td><td>Flat, not shift-driven</td></tr>
+<tr style="background:#fff5f5;"><td><strong>Tobi intent family</strong></td><td class="num"><strong>30% – 100%</strong></td><td><strong class="bad-highlight">Massive variation</strong></td></tr>
+</tbody>
+</table>
+<div class="callout"><div class="label">The insight</div><p>Misrouting is not caused by peak-time capacity, weekend staffing, or customer type. It is driven entirely by <strong>what the customer is asking about</strong>.</p></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 5 / 13</span></div>
+</section>
+
+<!-- ================ SLIDE 6 : WHERE IT FAILS ================ -->
+<section>
+<div class="eyebrow">Where it fails — 8 specific intents drive the problem</div>
+<h2>These Tobi intent families essentially never route correctly.</h2>
+<table>
+<thead><tr><th>Tobi intent family</th><th class="num">Sessions</th><th class="num">Misroute rate</th><th>Status</th></tr></thead>
+<tbody>
+<tr style="background:#fff5f5;"><td><strong>PX25</strong></td><td class="num">10,964</td><td class="num" style="color:var(--bad);"><strong>100.0%</strong></td><td><span class="badge bad">every session</span></td></tr>
+<tr><td>PX8</td><td class="num">10,843</td><td class="num">99.6%</td><td><span class="badge bad">critical</span></td></tr>
+<tr><td>PX9</td><td class="num">17,446</td><td class="num">99.2%</td><td><span class="badge bad">critical</span></td></tr>
+<tr><td>PX86</td><td class="num">16,674</td><td class="num">99.1%</td><td><span class="badge bad">critical</span></td></tr>
+<tr><td>PX71</td><td class="num">6,631</td><td class="num">94.0%</td><td><span class="badge bad">critical</span></td></tr>
+<tr><td>PX50</td><td class="num">11,566</td><td class="num">90.6%</td><td><span class="badge bad">critical</span></td></tr>
+<tr><td>PX43</td><td class="num">16,386</td><td class="num">90.0%</td><td><span class="badge bad">critical</span></td></tr>
+<tr><td>PX12</td><td class="num">5,579</td><td class="num">89.1%</td><td><span class="badge warn">high</span></td></tr>
+</tbody>
+</table>
+<p class="footnote">Together these 8 families = <strong>~30% of the KPI universe</strong> and misroute at <strong>~95% on average</strong>. Fix these and the headline number drops dramatically.</p>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 6 / 13</span></div>
+</section>
+
+<!-- ================ SLIDE 7 : WHERE IT WORKS ================ -->
+<section>
+<div class="eyebrow">Where it works — routing infrastructure isn't broken</div>
+<h2>Some intents route correctly ~70% of the time.</h2>
+<div class="cols-3">
+<div class="tile good"><h3>PX83</h3><div class="n">30.0%</div><p>misroute rate<br>9,472 sessions</p></div>
+<div class="tile good"><h3>PX68</h3><div class="n">30.1%</div><p>misroute rate<br>12,750 sessions</p></div>
+<div class="tile good"><h3>PX74</h3><div class="n">41.7%</div><p>misroute rate<br>14,472 sessions</p></div>
+</div>
+<div class="callout good" style="margin-top:1.2em;"><div class="label">Bottom line</div><p>The routing infrastructure <strong>can work</strong>. The failure is specific to 8 intent families, not systemic.</p></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 7 / 13</span></div>
+</section>
+
+<!-- ================ SLIDE 8 : WHAT THIS ACTUALLY IS ================ -->
+<section>
+<div class="eyebrow">What this actually is</div>
+<h1 style="font-size:2em;">A taxonomy mismatch<br>— <em>not</em> a routing bug.</h1>
+<p class="lede" style="max-width:none;">Both systems classify customer intent. For a specific set of intent families they use different labels for the same customer. The routing may still deliver the customer to the right team — but our KPI compares the <strong>labels</strong>, and the labels disagree.</p>
+<div class="versus">
+<div class="vs-box old"><div class="tag">Old framing</div><p>"Fix the routing."<br><em style="color:var(--muted);font-size:.9em;">→ Rebuild the routing model.</em></p></div>
+<div class="arrow">→</div>
+<div class="vs-box new"><div class="tag">New framing</div><p>"Reconcile the taxonomies."<br><em style="color:var(--muted);font-size:.9em;">→ Fix 8 specific intent families.</em></p></div>
+</div>
+<p class="footnote">Orders of magnitude smaller in scope. This is the positive story.</p>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 8 / 13</span></div>
+</section>
+
+<!-- ================ SLIDE 9 : RECOMMENDATIONS ================ -->
+<section>
+<div class="eyebrow">What we recommend — three actions</div>
+<h2>&nbsp;</h2>
+<ol>
+<li><strong>Prioritise taxonomy reconciliation on 8 intent families.</strong><br><span style="color:var(--muted);">PX25, PX8, PX9, PX86, PX71, PX50, PX43, PX12. Own-team meeting with Tobi and ACD leads. For each family, confirm what it represents on each side, and either align labels or add a translation layer.</span></li>
+<li><strong>Build a live monitoring dashboard.</strong><br><span style="color:var(--muted);">Once taxonomies are aligned, we need to watch the KPI move. Full spec ready — 8 panels, refresh daily, drill down by intent / queue / time / segment.</span></li>
+<li><strong>Repeat the analysis quarterly.</strong><br><span style="color:var(--muted);">Same SQL pipeline on updated (non-sampled) sources. Confirms the fix landed and catches regressions.</span></li>
+</ol>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 9 / 13</span></div>
+</section>
+
+<!-- ================ SLIDE 10 : DASHBOARD PREVIEW ================ -->
+<section>
+<div class="eyebrow">The dashboard we'd build — phase 2</div>
+<h2>Live monitoring for management and operations.</h2>
+<div class="cols-3">
+<div class="tile"><h3>1 · Headline KPI</h3><p>Current misroute rate with target line at 30%. Traffic-lighted (red/yellow/green).</p></div>
+<div class="tile"><h3>2 · Trend line</h3><p>Weekly rate over time so we can see the taxonomy fixes land.</p></div>
+<div class="tile"><h3>3 · Worst-routed intents</h3><p>Top 10 Tobi families by misroute rate. Priority list for the reconciliation team.</p></div>
+<div class="tile"><h3>4 · Misrouting queues</h3><p>Which ACD queues absorb the most misrouted traffic. Operations pain view.</p></div>
+<div class="tile"><h3>5 · Confusion heatmap</h3><p>Tobi × ACD family grid. Spot the specific "X becomes Y" confusion pairs.</p></div>
+<div class="tile"><h3>6 · Time patterns</h3><p>24×7 heatmap for regression detection over time.</p></div>
+</div>
+<p class="footnote">Estimated build time: <strong>3 – 5 days</strong> for polished version. Full spec in the analysis repo.</p>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 10 / 13</span></div>
+</section>
+
+<!-- ================ SLIDE 11 : CAVEATS ================ -->
+<section>
+<div class="eyebrow">Caveats — we disclose them up front</div>
+<h2>&nbsp;</h2>
+<ul>
+<li><strong>Sample data.</strong> Analysis runs on a fixed 12-month window (17-Jul-2025 → 20-Jul-2026). When productionised on non-sampled sources the SQL translates 1-for-1.</li>
+<li><strong>The final measurable universe is 310K sessions</strong> — ~2% of the full 16.1M Tobi sessions. Coverage funnel disclosed in the analysis repo.</li>
+<li><strong>PX103 is a large ACD destination</strong> absorbing traffic from many Tobi families. Awaiting confirmation from the ACD team on whether it is a legitimate product family or a catch-all bucket. The 76% may be adjusted for a "PX103 unclassified" split in a follow-up cut.</li>
+</ul>
+<p class="footnote">Every claim in this deck is traceable to a specific SQL query in the analysis repository. Nothing is hidden.</p>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 11 / 13</span></div>
+</section>
+
+<!-- ================ SLIDE 12 : ASKS ================ -->
+<section>
+<div class="eyebrow">What we're asking for today</div>
+<h1 style="font-size:1.8em;">Three decisions.</h1>
+<div class="cols-3">
+<div class="tile"><h3>1 · Endorse the workstream</h3><p style="font-size:1em;color:var(--dark);">Green-light the taxonomy-reconciliation workstream with Tobi and ACD leads, prioritised on the 8 families.</p></div>
+<div class="tile"><h3>2 · Green-light the dashboard</h3><p style="font-size:1em;color:var(--dark);">Approve the dashboard build so we can monitor the KPI live and confirm the taxonomy fixes are landing.</p></div>
+<div class="tile"><h3>3 · Establish cadence</h3><p style="font-size:1em;color:var(--dark);">Weekly 30-minute check-in during reconciliation phase to report on the misroute rate trend.</p></div>
+</div>
+<div class="callout" style="margin-top:1em;"><div class="label">Bottom line</div><p>The problem is measurable, the cause is specific, and the fix is scoped. We just need agreement to start.</p></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 12 / 13</span></div>
+</section>
+
+<!-- ================ SLIDE 13 : APPENDIX / Q&A ================ -->
+<section>
+<div class="eyebrow">Appendix — the numbers</div>
+<h2>All metrics in one place.</h2>
+<table>
+<thead><tr><th>Metric</th><th class="num">Value</th></tr></thead>
+<tbody>
+<tr><td>Total Tobi sessions analysed</td><td class="num">16,134,799</td></tr>
+<tr><td>Sessions with Tobi intent extracted</td><td class="num">13,479,208 (83.5%)</td></tr>
+<tr><td>Sessions transferred to an agent</td><td class="num">719,661</td></tr>
+<tr><td>KPI universe (both intent signals present)</td><td class="num">310,146</td></tr>
+<tr><td>Misrouted sessions</td><td class="num">235,378</td></tr>
+<tr style="background:#fff5f5;"><td><strong>Misroute rate</strong></td><td class="num"><strong style="color:var(--bad);">75.9%</strong></td></tr>
+<tr><td>Worst-performing intent</td><td class="num">PX25 (100%)</td></tr>
+<tr><td>Best-performing intents</td><td class="num">PX83, PX68 (~30%)</td></tr>
+</tbody>
+</table>
+<p class="footnote">Full analytical trail — every query, every result, every methodological decision — is documented in the analysis repository.</p>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 13 / 13 — Q&amp;A</span></div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+Reveal.initialize({
+  hash:true,
+  slideNumber:false,
+  controls:true,
+  progress:true,
+  center:false,
+  transition:'slide',
+  width:1280,
+  height:800,
+  margin:0.06,
+  minScale:0.4,
+  maxScale:1.6
+});
+</script>
+</body>
+</html>
