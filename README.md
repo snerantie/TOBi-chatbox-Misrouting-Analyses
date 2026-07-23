@@ -36,7 +36,10 @@ step by step.
 .
 ├── README.md
 ├── docs/
-│   ├── step1_intent_extraction_walkthrough.md   -- executive-facing walkthrough
+│   ├── management_presentation.md                -- business-facing narrative for the review meeting
+│   ├── dashboard_spec.md                          -- live-monitoring dashboard blueprint
+│   ├── step1_intent_extraction_walkthrough.md   -- executive-facing walkthrough (Step 1)
+│   ├── lead_review_agenda.md                     -- 40-min repo-tour agenda for the data-science lead
 │   └── eda_screenshots/                          -- BigQuery result captures
 └── sql/
     ├── 01_eda.sql                                -- Step 1: schema, volumes, log distribution

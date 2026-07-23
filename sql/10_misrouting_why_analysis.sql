@@ -151,3 +151,67 @@ FROM `vf-pt-copsvertex-live.cops_machine_learning.tmp_misrouting_kpi`
 WHERE intent_moment IS NOT NULL
 GROUP BY day_of_week, day_label
 ORDER BY day_of_week;
+
+
+
+-- -----------------------------------------------------------------------------
+-- Block F — Misroute rate by channel
+--
+-- Joins tmp_misrouting_kpi back to r_tobi_sessions_extended_kafka_sample
+-- (session-level) to get the CHANNEL column (chat / voice / whatsapp /
+-- ...) for each KPI-universe session.  Slices misroute rate by channel.
+--
+-- Reads: "Sessions arriving from channel X are misrouted at Y%."
+-- Interpretation: if one channel misroutes markedly more than others,
+-- it points at a channel-specific classification weakness (e.g. WhatsApp
+-- intents may be shorter and harder to classify than voice).
+--
+-- Aggregation note: extended-sessions has multi-block rows.  We
+-- aggregate per SessionID with ANY_VALUE(CHANNEL) which is safe as long
+-- as channel is stable per session (as expected).
+-- -----------------------------------------------------------------------------
+WITH channel_lookup AS (
+  SELECT
+    SessionID                                                                          AS session_id,
+    ANY_VALUE(CHANNEL)                                                                  AS channel
+  FROM `vf-pt-copsvertex-live.cops_machine_learning.r_tobi_sessions_extended_kafka_sample`
+  WHERE CHANNEL IS NOT NULL AND TRIM(CAST(CHANNEL AS STRING)) != ''
+  GROUP BY SessionID
+)
+SELECT
+  COALESCE(cl.channel, 'Unknown')                                                       AS channel,
+  COUNT(*)                                                                              AS n_sessions,
+  COUNTIF(k.is_misroute_family = TRUE)                                                  AS n_misroute,
+  ROUND(100 * COUNTIF(k.is_misroute_family = TRUE)
+        / NULLIF(COUNTIF(k.is_misroute_family IS NOT NULL), 0), 2)                       AS pct_misroute
+FROM      `vf-pt-copsvertex-live.cops_machine_learning.tmp_misrouting_kpi` k
+LEFT JOIN channel_lookup cl
+  USING (session_id)
+GROUP BY channel
+ORDER BY n_sessions DESC
+LIMIT 20;
+
+
+-- -----------------------------------------------------------------------------
+-- Block G — Tobi PX families sorted by misroute rate (not by volume)
+--
+-- Companion to Block B, which was sorted by volume.  This view sorts by
+-- pct_misroute DESC so the "always misrouted" families (like PX25 at
+-- 100%) surface at the top.  Filtered to families with >= 100 sessions
+-- so we don't chase rare families with unstable percentages.
+--
+-- Reads directly for the deck: "These are the intent families where
+-- Tobi's classification essentially never matches ACD's."
+-- -----------------------------------------------------------------------------
+SELECT
+  tobi_family,
+  COUNT(*)                                                                              AS n_sessions,
+  COUNTIF(is_misroute_family = TRUE)                                                    AS n_misroute,
+  ROUND(100 * COUNTIF(is_misroute_family = TRUE)
+        / NULLIF(COUNTIF(is_misroute_family IS NOT NULL), 0), 2)                         AS pct_misroute
+FROM `vf-pt-copsvertex-live.cops_machine_learning.tmp_misrouting_kpi`
+WHERE tobi_family IS NOT NULL
+GROUP BY tobi_family
+HAVING COUNT(*) >= 100
+ORDER BY pct_misroute DESC, n_sessions DESC
+LIMIT 30;
