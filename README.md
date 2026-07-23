@@ -46,8 +46,8 @@ step by step.
     ├── 05_handover_eda.sql                       -- Step 2: EDA on handover-related columns
     ├── 06_handover_flag.sql                       -- Step 2: build tmp_tobi_session_handover + QA + narrative
     ├── 07_acd_eda.sql                             -- Step 3: schema-first EDA on the ACD source (+ sample time-range check)
-    ├── 08_acd_intent_extraction.sql               -- Step 3: build tmp_acd_intent_per_session (planned)
-    ├── 09_misrouting_kpi.sql                      -- Step 3: join + both misroute flags + KPI (planned)
+    ├── 08_acd_intent_extraction.sql               -- Step 3: build tmp_acd_intent_per_interaction (dedup, whitespace normalised)
+    ├── 09_misrouting_kpi.sql                      -- Step 3: build tmp_misrouting_kpi + is_misroute_family + funnel + confusion matrix
     └── 10_misrouting_why_analysis.sql             -- Step 3: diagnostic slicing to explain the "why" (planned)
 ```
 
@@ -63,7 +63,7 @@ step by step.
 | `06_handover_flag.sql` | 2 | Build the working table `tmp_tobi_session_handover` (one row per Tobi session with `is_transferred`, `handover_destination`, `skill_acd`, `has_acd_landing`); run 4 QA checks and 3 analytical blocks (coverage funnel, intent × handover cross-tab, top ACD queues). | `f_tobi_logs_vertex`, `r_tobi_sessions_extended_kafka_sample` → `tmp_tobi_session_handover` |
 | `07_acd_eda.sql` | 3 | Section 1: schema of the ACD source table. Section 2: cross-table time-range verification (confirms the 17-Jul-2025 to 20-Jul-2026 sample window from Diogo). Sections 3-5 (volumes, intent distribution, first-row class buckets) come in a follow-up commit once the ACD schema is confirmed. | `r_cops_queue_and_interaction_all_sample`, `r_tobi_sessions_extended_kafka_sample`, `f_tobi_logs_vertex` |
 | `08_acd_intent_extraction.sql` | 3 | *(planned)* Build `tmp_acd_intent_per_session` — one row per ACD session with the first PX intent (mirror of Step 1's last S_ rule, reversed direction). Depends on the ACD schema from file 07. | `r_cops_queue_and_interaction_all_sample` → `tmp_acd_intent_per_session` |
-| `09_misrouting_kpi.sql` | 3 | *(planned)* Join TOBi intent + transfer flag + ACD intent, filter to `is_transferred = TRUE`, compute `is_misroute_family` (see Match granularity note below). Includes the coverage funnel and the headline KPI. | The three `tmp_*` tables |
+| `09_misrouting_kpi.sql` | 3 | Build `tmp_misrouting_kpi` — one row per Tobi session in the KPI universe (transferred + intent extracted + bridged to an ACD interaction with `px_1st`). Bridge via the extended-sessions `InteractionID`, earliest-by-`START_MOMENT`. Compute `is_misroute_family` at the numeric PX-family level (drops the `a` suffix on both sides). Includes 2 QA checks and 3 analytical blocks: coverage funnel, headline KPI, Tobi × ACD confusion matrix. | The three `tmp_*` tables + `r_tobi_sessions_extended_kafka_sample` |
 | `10_misrouting_why_analysis.sql` | 3 | *(planned)* Diagnostic slicing to help business answer *why* misrouting happens. Segmentation dimensions (customer_type, session length, time of day, identification status), intent dimensions (top misrouting PX families, top misrouting queues, PX-family × PX-family confusion matrix), and channel/context dimensions. | Working tables + `r_tobi_sessions_extended_kafka_sample` (for contextual attributes) |
 
 ## Source and working tables
