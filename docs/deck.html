@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css">
 <style>
-:root{--brand:#e60000;--dark:#1a1a1a;--muted:#666;--good:#0a8f3c;--bad:#e60000;--warn:#f7a01d;--soft:#f6f6f6;--line:#e5e5e5;--info:#0b78d1;}
+:root{--brand:#e60000;--dark:#1a1a1a;--muted:#666;--good:#0a8f3c;--bad:#e60000;--warn:#f7a01d;--soft:#f6f6f6;--line:#e5e5e5;--info:#0b78d1;--grey:#c8c8c8;}
 .reveal{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Inter",Roboto,Arial,sans-serif;font-size:24px;color:var(--dark);}
 .reveal .slides{text-align:left;}
 .reveal h1,.reveal h2,.reveal h3{font-family:inherit;color:var(--dark);text-transform:none;margin:0 0 .3em 0;line-height:1.15;}
@@ -51,9 +51,11 @@
 .reveal .callout{background:#fff5f5;border:1px solid #f5c6c6;border-radius:8px;padding:.9em 1.2em;margin:.7em 0;}
 .reveal .callout.good{background:#f4fbf6;border-color:#c8ecd4;}
 .reveal .callout.info{background:#eef6fd;border-color:#c1dcf1;}
+.reveal .callout.neutral{background:#f6f6f6;border-color:#e0e0e0;}
 .reveal .callout .label{font-size:.65em;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--brand);margin-bottom:.25em;}
 .reveal .callout.good .label{color:var(--good);}
 .reveal .callout.info .label{color:var(--info);}
+.reveal .callout.neutral .label{color:var(--dark);}
 .reveal .callout p{margin:0;font-weight:500;font-size:.9em;}
 .reveal .footer{position:absolute;bottom:.6em;left:2em;right:2em;font-size:.55em;color:var(--muted);display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:.5em;}
 .reveal .title-slide{text-align:center;padding-top:2em;}
@@ -86,6 +88,24 @@
 .reveal .funnel .bar.stage-5 .n{color:var(--bad);}
 .placeholder-note{background:#fef3e0;border:2px dashed var(--warn);border-radius:8px;padding:1em;text-align:center;font-size:.85em;color:#8a5c00;margin:.8em 0;}
 .placeholder-note strong{color:var(--warn);}
+
+/* NEW — Definitions/legend styles */
+.reveal .def-grid{display:grid;grid-template-columns:1fr 1fr;gap:1em;margin-top:.5em;}
+.reveal .def-card{background:#fff;border:1px solid var(--line);border-left:4px solid var(--info);border-radius:8px;padding:.9em 1em;}
+.reveal .def-card h3{font-size:.85em;color:var(--info);margin:0 0 .35em 0;font-weight:800;text-transform:uppercase;letter-spacing:.08em;}
+.reveal .def-card p{font-size:.85em;color:var(--dark);line-height:1.45;margin:0;}
+.reveal .def-card p + p{margin-top:.4em;color:var(--muted);}
+.reveal .def-card.brand{border-left-color:var(--brand);}
+.reveal .def-card.brand h3{color:var(--brand);}
+.reveal .def-card.warn{border-left-color:var(--warn);}
+.reveal .def-card.warn h3{color:var(--warn);}
+.reveal .colour-legend{display:flex;gap:1em;flex-wrap:wrap;margin:.5em 0;font-size:.75em;color:var(--muted);}
+.reveal .colour-legend .swatch{display:inline-flex;align-items:center;gap:.4em;}
+.reveal .colour-legend .swatch .box{display:inline-block;width:14px;height:14px;border-radius:3px;}
+.reveal .chart-note{background:#f6f6f6;border-left:3px solid #999;border-radius:4px;padding:.5em .8em;margin-top:.4em;font-size:.65em;color:var(--muted);line-height:1.4;}
+.reveal .chart-note strong{color:var(--dark);}
+.reveal .mini-glossary{position:absolute;top:.6em;right:2em;background:#f6f6f6;border-radius:6px;padding:.35em .7em;font-size:.55em;color:var(--muted);border:1px solid var(--line);max-width:18em;}
+.reveal .mini-glossary strong{color:var(--dark);}
 </style>
 </head>
 <body>
@@ -98,7 +118,7 @@
 <h1>Are We Sending Customers<br>To The Right Team?</h1>
 <p class="sub">TOBi Chatbot ↔ ACD Misrouting Analysis</p>
 <p class="meta">Data Science • Sample window 17 Jul 2025 → 20 Jul 2026</p>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 1 / 14</span></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 1 / 15</span></div>
 </section>
 
 <!-- ================ SLIDE 2 : THE QUESTION ================ -->
@@ -107,7 +127,7 @@
 <h1>When we transfer a customer<br>from Tobi to a human agent…</h1>
 <p class="lede" style="font-size:1.5em;margin-top:.6em;">…<span class="bad-highlight">do they land on the team that matches their reason for calling?</span></p>
 <p class="footnote">If they do → routing works. If they don't → we're paying a cost every time (customer waits, agent transfers again, satisfaction drops, cost per contact goes up).</p>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 2 / 14</span></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 2 / 15</span></div>
 </section>
 
 <!-- ================ SLIDE 3 : THE HEADLINE ================ -->
@@ -116,10 +136,50 @@
 <div class="kpi-hero">75.9%<small><br>of transferred customers are misrouted</small></div>
 <p class="kpi-caption" style="margin:1em auto;text-align:center;"><strong>235,378</strong> of <strong>310,146</strong> transferred sessions where we can measure both sides<br>land on a team whose intent classification disagrees with Tobi's.</p>
 <div class="callout" style="text-align:left;max-width:32em;margin:1em auto;"><div class="label">Say out loud</div><p>Three in every four transferred customers end up in front of a team that has classified them differently from what Tobi predicted.</p></div>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 3 / 14</span></div>
+<p class="footnote" style="text-align:center;">Next slide → <em>How to read this deck</em> (definitions, colour legend, PX codes).</p>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 3 / 15</span></div>
 </section>
 
-<!-- ================ SLIDE 4 : HOW WE MEASURED IT — funnel chart ================ -->
+<!-- ================ SLIDE 4 : HOW TO READ THIS DECK (NEW) ================ -->
+<section>
+<div class="eyebrow">How to read this deck — plain-English definitions</div>
+<h2>Three things repeat throughout. Here is what they mean.</h2>
+<div class="def-grid">
+
+<div class="def-card brand">
+<h3>KPI universe = 310,146 sessions</h3>
+<p>The <strong>only</strong> sessions where we can fairly compare Tobi and ACD: (a) Tobi captured a customer intent, (b) the session was transferred to a human agent, and (c) ACD tagged the interaction with its own intent.</p>
+<p>Everything smaller than the 16.1M total drops out because one of the two sides did not classify the customer — nothing to compare against.</p>
+</div>
+
+<div class="def-card">
+<h3>Tobi intent family = "PX + number"</h3>
+<p>Both Tobi (the chatbot) and ACD (the call-routing system) tag every conversation with an <strong>intent code</strong> of the form <code>PX8</code>, <code>PX25</code>, <code>PX103</code>, etc. This is Vodafone Portugal's internal taxonomy — one PX code per topic area (e.g. billing, contract, technical, etc.).</p>
+<p>Both systems use the same PX naming scheme. Misrouting = when Tobi says <code>PX9</code> but ACD's queue is labelled <code>PX83</code> for the same customer.</p>
+<p><em>Human-readable label per PX code lives with the ACD team (Diogo). We report the codes as they appear in the raw data.</em></p>
+</div>
+
+<div class="def-card warn">
+<h3>Colour legend used in every chart</h3>
+<div class="colour-legend" style="margin-top:.3em;">
+<span class="swatch"><span class="box" style="background:#e60000;"></span><strong>Red</strong> = high misroute rate (bad)</span>
+<span class="swatch"><span class="box" style="background:#f4a8a8;"></span><strong>Pink</strong> = moderately high (concerning)</span>
+<span class="swatch"><span class="box" style="background:#0a8f3c;"></span><strong>Green</strong> = well-routed (good)</span>
+<span class="swatch"><span class="box" style="background:#c8c8c8;"></span><strong>Grey</strong> = neutral / comparison baseline</span>
+<span class="swatch"><span class="box" style="background:transparent;border:1px dashed #666;"></span><strong>Dashed line</strong> = overall 75.9% average (for reference)</span>
+</div>
+</div>
+
+<div class="def-card">
+<h3>Misroute rate = share of transferred sessions where labels disagree</h3>
+<p>Formula = (misrouted sessions ÷ KPI universe) × 100. A session is "misrouted" when Tobi's PX code ≠ ACD's PX code. Volume tags on the charts (in brackets) are the number of sessions inside that slice — not percentages.</p>
+</div>
+
+</div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 4 / 15</span></div>
+</section>
+
+<!-- ================ SLIDE 5 : HOW WE MEASURED IT — funnel chart ================ -->
 <section>
 <div class="eyebrow">How we measured it — from 16.1M sessions to the KPI</div>
 <h2>Every number is traceable to a specific SQL query.</h2>
@@ -131,58 +191,88 @@
 <div class="bar stage-5"><span>5 · Misrouted (76%)</span><span class="n">235,378</span></div>
 </div>
 <div class="callout good"><div class="label">Not an opinion</div><p>Two systems classify the same customer. We're just checking whether they agree.</p></div>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 4 / 14</span></div>
+<p class="chart-note"><strong>Read this as:</strong> we start with 16.1M chatbot sessions, filter down to sessions where <em>both</em> systems tagged an intent, and end at 310K sessions — the "KPI universe" from Slide 4.</p>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 5 / 15</span></div>
 </section>
 
-<!-- ================ SLIDE 5 : STRUCTURAL NOT SITUATIONAL — chart ================ -->
+<!-- ================ SLIDE 6 : STRUCTURAL NOT SITUATIONAL — chart ================ -->
 <section>
 <div class="eyebrow">Structural, not situational</div>
-<h2>The 76% rate is flat across every slice — except one.</h2>
-<div class="chart-wrap" style="height:400px;"><canvas id="chart5"></canvas></div>
-<div class="callout"><div class="label">The insight</div><p>Not caused by peak-time capacity, weekend staffing, or customer type. Driven entirely by <strong>what the customer is asking about</strong>.</p></div>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 5 / 14</span></div>
+<h2>The 76% rate is flat across every slice — except intent family.</h2>
+<div class="chart-wrap" style="height:340px;"><canvas id="chart5"></canvas></div>
+<div class="colour-legend" style="justify-content:center;margin-top:-.3em;">
+<span class="swatch"><span class="box" style="background:#c8c8c8;"></span>Grey bar = range narrow (dimension does not drive misrouting)</span>
+<span class="swatch"><span class="box" style="background:#e60000;"></span>Red bar = range wide (this dimension does drive misrouting)</span>
+<span class="swatch"><span class="box" style="background:transparent;border:1px dashed #666;"></span>Dashed = overall 75.9%</span>
+</div>
+<p class="chart-note"><strong>How to read:</strong> each bar shows the <em>min–max spread</em> of misroute rate when we slice by that dimension. Segment, time-of-day, day-of-week, and channel all sit in a tight 73–83% band. When we slice by <strong>Tobi intent family</strong>, the range explodes to 30–100% — meaning the intent code is the only dimension that actually differentiates good vs. bad routing.</p>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 6 / 15</span></div>
 </section>
 
-<!-- ================ SLIDE 6 : WHERE IT FAILS — bar chart ================ -->
+<!-- ================ SLIDE 7 : WHERE IT FAILS — bar chart ================ -->
 <section>
+<div class="mini-glossary"><strong>PX + number</strong> = a Tobi/ACD intent code. Human label per code sits with the ACD team.</div>
 <div class="eyebrow">Where it fails — 8 intent families drive the problem</div>
 <h2>Some Tobi intents essentially never route correctly.</h2>
-<div class="chart-wrap" style="height:440px;"><canvas id="chart6"></canvas></div>
+<div class="chart-wrap" style="height:400px;"><canvas id="chart6"></canvas></div>
+<div class="colour-legend" style="margin-top:-.3em;">
+<span class="swatch"><span class="box" style="background:#e60000;"></span>≥ 99% misrouted (systemic failure)</span>
+<span class="swatch"><span class="box" style="background:#f4a8a8;"></span>89 – 95% misrouted (severe)</span>
+<span class="swatch"><span class="box" style="background:transparent;border:1px dashed #666;"></span>Overall 75.9%</span>
+<span class="swatch">Volume in brackets = # sessions in that family</span>
+</div>
 <p class="footnote">Together these 8 families = <strong>~30% of the KPI universe</strong> and misroute at <strong>~95% on average</strong>. Fix these and the headline number drops dramatically.</p>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 6 / 14</span></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 7 / 15</span></div>
 </section>
 
-<!-- ================ SLIDE 7 : WHERE IT WORKS — comparison chart ================ -->
+<!-- ================ SLIDE 8 : WHERE IT WORKS — comparison chart ================ -->
 <section>
+<div class="mini-glossary"><strong>PX + number</strong> = a Tobi/ACD intent code. Human label per code sits with the ACD team.</div>
 <div class="eyebrow">Where it works — routing infrastructure isn't broken</div>
 <h2>Well-routed families sit at 30 – 42%.</h2>
-<div class="chart-wrap" style="height:400px;"><canvas id="chart7"></canvas></div>
+<div class="chart-wrap" style="height:340px;"><canvas id="chart7"></canvas></div>
+<div class="colour-legend" style="margin-top:-.3em;">
+<span class="swatch"><span class="box" style="background:#0a8f3c;"></span>Green = well-routed (below overall average)</span>
+<span class="swatch"><span class="box" style="background:transparent;border:1px dashed #666;"></span>Overall 75.9%</span>
+</div>
 <div class="callout good"><div class="label">Bottom line</div><p>The routing infrastructure <strong>can work</strong>. The failure is specific to 8 intent families, not systemic.</p></div>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 7 / 14</span></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 8 / 15</span></div>
 </section>
 
-<!-- ================ SLIDE 8 : BY SEGMENT — pie/bar chart ================ -->
+<!-- ================ SLIDE 9 : BY SEGMENT — pie/bar chart ================ -->
 <section>
 <div class="eyebrow">By customer segment — everyone experiences it equally</div>
 <h2>Consumer and Business misroute at the same rate.</h2>
 <div class="cols">
-<div class="chart-wrap" style="height:340px;"><canvas id="chart8_pie"></canvas></div>
-<div class="chart-wrap" style="height:340px;"><canvas id="chart8_bar"></canvas></div>
+<div class="chart-wrap" style="height:320px;"><canvas id="chart8_pie"></canvas></div>
+<div class="chart-wrap" style="height:320px;"><canvas id="chart8_bar"></canvas></div>
+</div>
+<div class="colour-legend" style="justify-content:center;margin-top:.2em;">
+<span class="swatch"><span class="box" style="background:#e60000;"></span>Consumer</span>
+<span class="swatch"><span class="box" style="background:#f7a01d;"></span>Business</span>
+<span class="swatch"><span class="box" style="background:#666;"></span>Unknown segment</span>
+<span class="swatch"><span class="box" style="background:transparent;border:1px dashed #666;"></span>Overall 75.9%</span>
 </div>
 <p class="footnote">Consumer and Business are within 0.3 percentage points — misrouting is <strong>not a segmentation story</strong>. Unknown segment is slightly higher (85%) but only 1.5% of volume.</p>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 8 / 14</span></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 9 / 15</span></div>
 </section>
 
-<!-- ================ SLIDE 9 : BY CHANNEL — placeholder + chart ================ -->
+<!-- ================ SLIDE 10 : BY CHANNEL ================ -->
 <section>
 <div class="eyebrow">By channel — the descriptive "why"</div>
 <h2>Every channel misroutes at least 3 in 4 sessions.</h2>
-<div class="chart-wrap" style="height:360px;"><canvas id="chart9"></canvas></div>
+<div class="chart-wrap" style="height:340px;"><canvas id="chart9"></canvas></div>
+<div class="colour-legend" style="justify-content:center;margin-top:-.2em;">
+<span class="swatch"><span class="box" style="background:#0b78d1;"></span>Best-performing channel (below overall)</span>
+<span class="swatch"><span class="box" style="background:#f4a8a8;"></span>Around overall (76–79%)</span>
+<span class="swatch"><span class="box" style="background:#e60000;"></span>Worst-performing (≥ 80%)</span>
+<span class="swatch"><span class="box" style="background:transparent;border:1px dashed #666;"></span>Overall 75.9%</span>
+</div>
 <div class="callout"><div class="label">The insight</div><p><strong>App is the best-performing channel at 73%</strong>, Web at 78%, and the partner channels (amigo_web, amigo_app) sit between 75% and 83%. Even the best channel is misrouting three in four sessions — reinforcing that the problem is <strong>intent-classification, not channel-specific</strong>.</p></div>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 9 / 14</span></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 10 / 15</span></div>
 </section>
 
-<!-- ================ SLIDE 10 : WHAT THIS IS ================ -->
+<!-- ================ SLIDE 11 : WHAT THIS IS ================ -->
 <section>
 <div class="eyebrow">What this actually is</div>
 <h1 style="font-size:2em;">A taxonomy mismatch<br>— <em>not</em> a routing bug.</h1>
@@ -193,10 +283,10 @@
 <div class="vs-box new"><div class="tag">New framing</div><p>"Reconcile the taxonomies."<br><em style="color:var(--muted);font-size:.9em;">→ Fix 8 specific intent families.</em></p></div>
 </div>
 <p class="footnote">Orders of magnitude smaller in scope. This is the positive story.</p>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 10 / 14</span></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 11 / 15</span></div>
 </section>
 
-<!-- ================ SLIDE 11 : RECOMMENDATIONS ================ -->
+<!-- ================ SLIDE 12 : RECOMMENDATIONS ================ -->
 <section>
 <div class="eyebrow">What we recommend — three actions</div>
 <h2>&nbsp;</h2>
@@ -205,10 +295,10 @@
 <li><strong>Build a live monitoring dashboard.</strong><br><span style="color:var(--muted);">Once taxonomies are aligned, we need to watch the KPI move. Full spec ready — 8 panels, refresh daily, drill down by intent / queue / time / segment / channel.</span></li>
 <li><strong>Repeat the analysis quarterly.</strong><br><span style="color:var(--muted);">Same SQL pipeline on updated (non-sampled) sources. Confirms the fix landed and catches regressions.</span></li>
 </ol>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 11 / 14</span></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 12 / 15</span></div>
 </section>
 
-<!-- ================ SLIDE 12 : DASHBOARD PREVIEW ================ -->
+<!-- ================ SLIDE 13 : DASHBOARD PREVIEW ================ -->
 <section>
 <div class="eyebrow">The dashboard we'd build — phase 2</div>
 <h2>Live monitoring for management and operations.</h2>
@@ -221,23 +311,24 @@
 <div class="tile info"><h3>6 · Channel breakdown</h3><p>Misroute rate by channel (Voice / Chat / etc.).</p></div>
 </div>
 <p class="footnote">Estimated build time: <strong>3 – 5 days</strong> for polished version.</p>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 12 / 14</span></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 13 / 15</span></div>
 </section>
 
-<!-- ================ SLIDE 13 : CAVEATS ================ -->
+<!-- ================ SLIDE 14 : CAVEATS ================ -->
 <section>
 <div class="eyebrow">Caveats — we disclose them up front</div>
 <h2>&nbsp;</h2>
 <ul>
 <li><strong>Sample data.</strong> Analysis runs on a fixed 12-month window (17-Jul-2025 → 20-Jul-2026). When productionised on non-sampled sources the SQL translates 1-for-1.</li>
-<li><strong>The final measurable universe is 310K sessions</strong> — ~2% of the full 16.1M Tobi sessions. Coverage funnel disclosed in Slide 4.</li>
+<li><strong>The final measurable universe is 310K sessions</strong> — ~2% of the full 16.1M Tobi sessions. Coverage funnel disclosed in Slide 5.</li>
 <li><strong>PX103 is a large ACD destination</strong> absorbing traffic from many Tobi families. Awaiting confirmation from the ACD team on whether it is a legitimate product family or a catch-all bucket.</li>
+<li><strong>PX code → human label mapping</strong> is owned by the ACD team. We report codes verbatim; Diogo to supply business names for the 8 families flagged on Slide 7.</li>
 </ul>
 <p class="footnote">Every claim in this deck is traceable to a specific SQL query in the analysis repository.</p>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 13 / 14</span></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 14 / 15</span></div>
 </section>
 
-<!-- ================ SLIDE 14 : ASKS ================ -->
+<!-- ================ SLIDE 15 : ASKS ================ -->
 <section>
 <div class="eyebrow">What we're asking for today</div>
 <h1 style="font-size:1.7em;">Three decisions.</h1>
@@ -247,7 +338,7 @@
 <div class="tile"><h3>3 · Establish cadence</h3><p style="font-size:1em;color:var(--dark);">Weekly 30-minute check-in during reconciliation phase to report on the misroute rate trend.</p></div>
 </div>
 <div class="callout" style="margin-top:1em;"><div class="label">Bottom line</div><p>The problem is measurable, the cause is specific, and the fix is scoped. We just need agreement to start.</p></div>
-<div class="footer"><span>Confidential — Internal</span><span>Slide 14 / 14</span></div>
+<div class="footer"><span>Confidential — Internal</span><span>Slide 15 / 15</span></div>
 </section>
 
 </div>
@@ -268,20 +359,31 @@ Chart.defaults.color = '#1a1a1a';
 Chart.defaults.plugins.legend.labels.usePointStyle = true;
 Chart.defaults.plugins.legend.labels.boxWidth = 10;
 
-const brand = '#e60000', good='#0a8f3c', muted='#666', soft='#f6f6f6', warn='#f7a01d', info='#0b78d1';
+const brand = '#e60000', good='#0a8f3c', muted='#666', soft='#f6f6f6', warn='#f7a01d', info='#0b78d1', grey='#c8c8c8';
 
 // Helper — target-line plugin (draws horizontal ref line)
 const targetLine = (yVal, label='target') => ({
   id:'targetLine_'+yVal,
   afterDraw(chart){
-    const {ctx, chartArea:{left,right}, scales:{y}} = chart;
-    if(!y) return;
-    const yPos = y.getPixelForValue(yVal);
+    const {ctx, chartArea:{left,right}, scales:{y,x}} = chart;
+    const scale = chart.options.indexAxis === 'y' ? x : y;
+    if(!scale) return;
+    const pos = chart.options.indexAxis === 'y' ? scale.getPixelForValue(yVal) : y.getPixelForValue(yVal);
     ctx.save();
-    ctx.strokeStyle='#999';ctx.setLineDash([5,4]);ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(left,yPos);ctx.lineTo(right,yPos);ctx.stroke();
-    ctx.setLineDash([]);ctx.fillStyle='#666';ctx.font='11px sans-serif';
-    ctx.fillText(label+' '+yVal+'%',left+8,yPos-4);
+    ctx.strokeStyle='#666';ctx.setLineDash([6,4]);ctx.lineWidth=1.5;
+    ctx.beginPath();
+    if(chart.options.indexAxis === 'y'){
+      ctx.moveTo(pos,chart.chartArea.top);ctx.lineTo(pos,chart.chartArea.bottom);
+    } else {
+      ctx.moveTo(left,pos);ctx.lineTo(right,pos);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);ctx.fillStyle='#333';ctx.font='bold 11px sans-serif';
+    if(chart.options.indexAxis === 'y'){
+      ctx.fillText(label+' '+yVal+'%',pos+4,chart.chartArea.top+12);
+    } else {
+      ctx.fillText(label+' '+yVal+'%',left+8,pos-4);
+    }
     ctx.restore();
   }
 });
@@ -290,37 +392,48 @@ Reveal.on('ready', () => renderCharts());
 Reveal.on('slidechanged', () => renderCharts());
 
 function renderCharts(){
-  // --- Slide 5 — dimension comparison ---
+  // --- Slide 6 — dimension comparison (floating range bars) ---
   if(document.getElementById('chart5') && !window._c5){
+    // Each bar = [min, max] misroute range when sliced by that dimension
+    // Data sources:
+    //   Segment: 75.74 (Consumer) → 76.05 (Business), unknown excluded from the range
+    //   Peak hours (9-20 vs off-peak): 74.9 → 76.7
+    //   Days (Mon-Sun): 75.1 → 76.6
+    //   Channel: 73.34 (App) → 83.22 (amigo_web)
+    //   Tobi intent family: 30.0 (PX83) → 100.0 (PX25)
     window._c5 = new Chart(document.getElementById('chart5'),{
       type:'bar',
       data:{
-        labels:['Consumer','Business','Peak hours (9-20)','Days (Mon-Sun)','Tobi intent family'],
-        datasets:[
-          {label:'Min misroute %',data:[75.7,76.1,74.9,75.1,30.0],backgroundColor:'#ddd',stack:'a',barPercentage:.55,categoryPercentage:.9},
-          {label:'Range',data:[0.4,0.0,1.8,1.5,70.0],backgroundColor:(ctx)=>ctx.dataIndex===4?brand:'#f4a8a8',stack:'a',barPercentage:.55,categoryPercentage:.9}
-        ]
+        labels:['Segment (Consumer / Business)','Peak vs off-peak hours','Day of week (Mon-Sun)','Channel (Web / App / Amigo)','Tobi intent family (PX code)'],
+        datasets:[{
+          label:'Misroute-rate range (min → max)',
+          data:[[75.7,76.1],[74.9,76.7],[75.1,76.6],[73.3,83.2],[30.0,100.0]],
+          backgroundColor:(ctx)=>ctx.dataIndex===4?brand:grey,
+          borderColor:(ctx)=>ctx.dataIndex===4?brand:'#999',
+          borderWidth:1,
+          borderSkipped:false,
+          barPercentage:.6,categoryPercentage:.9
+        }]
       },
       options:{
         responsive:true,maintainAspectRatio:false,indexAxis:'y',
         scales:{
-          x:{beginAtZero:true,max:105,ticks:{callback:v=>v+'%'},title:{display:true,text:'Misroute rate (%)'}},
-          y:{ticks:{font:{size:13}}}
+          x:{beginAtZero:true,max:105,ticks:{callback:v=>v+'%'},title:{display:true,text:'Misroute rate range (%)'}},
+          y:{ticks:{font:{size:12,weight:'600'}}}
         },
         plugins:{
           legend:{display:false},
-          tooltip:{callbacks:{label:(t)=>{
-            if(t.datasetIndex===0)return 'min: '+t.raw+'%';
-            const lo=t.chart.data.datasets[0].data[t.dataIndex],hi=lo+t.raw;
-            return 'max: '+hi.toFixed(1)+'%';
-          }}}
+          tooltip:{callbacks:{
+            title:(t)=>t[0].label,
+            label:(t)=>{const [lo,hi]=t.raw;return 'Range: '+lo+'% → '+hi+'%  (spread '+(hi-lo).toFixed(1)+' pp)';}
+          }}
         }
       },
       plugins:[targetLine(75.9,'overall')]
     });
   }
 
-  // --- Slide 6 — top misrouting families ---
+  // --- Slide 7 — top misrouting families ---
   if(document.getElementById('chart6') && !window._c6){
     window._c6 = new Chart(document.getElementById('chart6'),{
       type:'bar',
@@ -355,7 +468,7 @@ function renderCharts(){
     });
   }
 
-  // --- Slide 7 — where it works ---
+  // --- Slide 8 — where it works ---
   if(document.getElementById('chart7') && !window._c7){
     window._c7 = new Chart(document.getElementById('chart7'),{
       type:'bar',
@@ -390,7 +503,7 @@ function renderCharts(){
     });
   }
 
-  // --- Slide 8 — segments ---
+  // --- Slide 9 — segments ---
   if(document.getElementById('chart8_pie') && !window._c8p){
     window._c8p = new Chart(document.getElementById('chart8_pie'),{
       type:'doughnut',
@@ -426,7 +539,7 @@ function renderCharts(){
     });
   }
 
-  // --- Slide 9 — CHANNEL (real data from Block F) ---
+  // --- Slide 10 — CHANNEL (real data from Block F) ---
   if(document.getElementById('chart9') && !window._c9){
     window._c9 = new Chart(document.getElementById('chart9'),{
       type:'bar',
