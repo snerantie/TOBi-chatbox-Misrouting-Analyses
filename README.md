@@ -48,7 +48,7 @@ step by step.
     ├── 07_acd_eda.sql                             -- Step 3: schema-first EDA on the ACD source (+ sample time-range check)
     ├── 08_acd_intent_extraction.sql               -- Step 3: build tmp_acd_intent_per_interaction (dedup, whitespace normalised)
     ├── 09_misrouting_kpi.sql                      -- Step 3: build tmp_misrouting_kpi + is_misroute_family + funnel + confusion matrix
-    └── 10_misrouting_why_analysis.sql             -- Step 3: diagnostic slicing to explain the "why" (planned)
+    └── 10_misrouting_why_analysis.sql             -- Step 3: 5 diagnostic slices (segment / Tobi family / ACD queue / hour / day)
 ```
 
 ## What each file produces
@@ -64,7 +64,7 @@ step by step.
 | `07_acd_eda.sql` | 3 | Section 1: schema of the ACD source table. Section 2: cross-table time-range verification (confirms the 17-Jul-2025 to 20-Jul-2026 sample window from Diogo). Sections 3-5 (volumes, intent distribution, first-row class buckets) come in a follow-up commit once the ACD schema is confirmed. | `r_cops_queue_and_interaction_all_sample`, `r_tobi_sessions_extended_kafka_sample`, `f_tobi_logs_vertex` |
 | `08_acd_intent_extraction.sql` | 3 | *(planned)* Build `tmp_acd_intent_per_session` — one row per ACD session with the first PX intent (mirror of Step 1's last S_ rule, reversed direction). Depends on the ACD schema from file 07. | `r_cops_queue_and_interaction_all_sample` → `tmp_acd_intent_per_session` |
 | `09_misrouting_kpi.sql` | 3 | Build `tmp_misrouting_kpi` — one row per Tobi session in the KPI universe (transferred + intent extracted + bridged to an ACD interaction with `px_1st`). Bridge via the extended-sessions `InteractionID`, earliest-by-`START_MOMENT`. Compute `is_misroute_family` at the numeric PX-family level (drops the `a` suffix on both sides). Includes 2 QA checks and 3 analytical blocks: coverage funnel, headline KPI, Tobi × ACD confusion matrix. | The three `tmp_*` tables + `r_tobi_sessions_extended_kafka_sample` |
-| `10_misrouting_why_analysis.sql` | 3 | *(planned)* Diagnostic slicing to help business answer *why* misrouting happens. Segmentation dimensions (customer_type, session length, time of day, identification status), intent dimensions (top misrouting PX families, top misrouting queues, PX-family × PX-family confusion matrix), and channel/context dimensions. | Working tables + `r_tobi_sessions_extended_kafka_sample` (for contextual attributes) |
+| `10_misrouting_why_analysis.sql` | 3 | Five diagnostic slicing blocks against `tmp_misrouting_kpi` to answer the *why*: **A** misroute rate by customer segment (normalised); **B** top 20 Tobi PX families by misroute rate (which Tobi intents get misrouted most); **C** top 20 SkillACD queues by absolute misroute count (which ACD queues absorb the pain, with T-suffix technical flag); **D** misroute rate by hour of day; **E** misroute rate by day of week. Read-only — no pipeline tables changed. | `tmp_misrouting_kpi` |
 
 ## Source and working tables
 
@@ -180,9 +180,9 @@ is fully signed off; Step 2 (file 05) is the current work-in-progress.
   flag + ACD intent, filters to `is_transferred = TRUE`, and computes
   `is_misroute_family` (ACD-side data only carries PX-family, so a
   strict 4-part match is not feasible — see Match granularity note).
-- **Then:** `sql/10_misrouting_why_analysis.sql` produces the diagnostic
-  slicing views (who / which intent / which channel) so business can
-  answer *why* misrouting happens, not just *how much*.
+- **Also delivered:** `sql/10_misrouting_why_analysis.sql` slices the
+  KPI by segment, Tobi PX family, ACD queue, hour of day and day of
+  week — the diagnostic material for the *why* narrative.
 
 ### Note on match granularity
 
