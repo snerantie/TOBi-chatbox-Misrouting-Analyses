@@ -99,12 +99,12 @@
 .reveal .def-card.brand h3{color:var(--brand);}
 .reveal .def-card.warn{border-left-color:var(--warn);}
 .reveal .def-card.warn h3{color:var(--warn);}
-.reveal .colour-legend{display:flex;gap:1em;flex-wrap:wrap;margin:.5em 0;font-size:.75em;color:var(--muted);}
-.reveal .colour-legend .swatch{display:inline-flex;align-items:center;gap:.4em;}
-.reveal .colour-legend .swatch .box{display:inline-block;width:14px;height:14px;border-radius:3px;}
-.reveal .chart-note{background:#f6f6f6;border-left:3px solid #999;border-radius:4px;padding:.5em .8em;margin-top:.4em;font-size:.65em;color:var(--muted);line-height:1.4;}
+.reveal .colour-legend{display:flex;gap:.9em 1.4em;flex-wrap:wrap;margin:.7em 0 .3em 0;font-size:.65em;color:var(--muted);line-height:1.3;}
+.reveal .colour-legend .swatch{display:inline-flex;align-items:center;gap:.4em;white-space:nowrap;}
+.reveal .colour-legend .swatch .box{display:inline-block;width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+.reveal .chart-note{background:#f6f6f6;border-left:3px solid #999;border-radius:4px;padding:.45em .8em;margin-top:.3em;font-size:.6em;color:var(--muted);line-height:1.4;}
 .reveal .chart-note strong{color:var(--dark);}
-.reveal .mini-glossary{position:absolute;top:.6em;right:2em;background:#f6f6f6;border-radius:6px;padding:.35em .7em;font-size:.55em;color:var(--muted);border:1px solid var(--line);max-width:18em;}
+.reveal .mini-glossary{display:inline-block;background:#f6f6f6;border-radius:6px;padding:.3em .7em;font-size:.55em;color:var(--muted);border:1px solid var(--line);margin-bottom:.4em;}
 .reveal .mini-glossary strong{color:var(--dark);}
 </style>
 </head>
@@ -199,27 +199,27 @@
 <section>
 <div class="eyebrow">Structural, not situational</div>
 <h2>The 76% rate is flat across every slice — except intent family.</h2>
-<div class="chart-wrap" style="height:340px;"><canvas id="chart5"></canvas></div>
-<div class="colour-legend" style="justify-content:center;margin-top:-.3em;">
-<span class="swatch"><span class="box" style="background:#c8c8c8;"></span>Grey bar = range narrow (dimension does not drive misrouting)</span>
-<span class="swatch"><span class="box" style="background:#e60000;"></span>Red bar = range wide (this dimension does drive misrouting)</span>
+<div class="chart-wrap" style="height:290px;"><canvas id="chart5"></canvas></div>
+<div class="colour-legend" style="justify-content:center;">
+<span class="swatch"><span class="box" style="background:#c8c8c8;"></span>Grey = narrow range (dimension does not drive misrouting)</span>
+<span class="swatch"><span class="box" style="background:#e60000;"></span>Red = wide range (this dimension drives misrouting)</span>
 <span class="swatch"><span class="box" style="background:transparent;border:1px dashed #666;"></span>Dashed = overall 75.9%</span>
 </div>
-<p class="chart-note"><strong>How to read:</strong> each bar shows the <em>min–max spread</em> of misroute rate when we slice by that dimension. Segment, time-of-day, day-of-week, and channel all sit in a tight 73–83% band. When we slice by <strong>Tobi intent family</strong>, the range explodes to 30–100% — meaning the intent code is the only dimension that actually differentiates good vs. bad routing.</p>
+<p class="chart-note"><strong>How to read:</strong> each bar = the min–max spread of misroute rate when sliced by that dimension. Segment, time-of-day, day-of-week and channel all sit in a tight 73–83% band. Only <strong>Tobi intent family</strong> ranges 30–100% — so the intent code is the driver.</p>
 <div class="footer"><span>Confidential — Internal</span><span>Slide 6 / 15</span></div>
 </section>
 
 <!-- ================ SLIDE 7 : WHERE IT FAILS — bar chart ================ -->
 <section>
-<div class="mini-glossary"><strong>PX + number</strong> = a Tobi/ACD intent code. Human label per code sits with the ACD team.</div>
 <div class="eyebrow">Where it fails — 8 intent families drive the problem</div>
 <h2>Some Tobi intents essentially never route correctly.</h2>
-<div class="chart-wrap" style="height:400px;"><canvas id="chart6"></canvas></div>
-<div class="colour-legend" style="margin-top:-.3em;">
-<span class="swatch"><span class="box" style="background:#e60000;"></span>≥ 99% misrouted (systemic failure)</span>
-<span class="swatch"><span class="box" style="background:#f4a8a8;"></span>89 – 95% misrouted (severe)</span>
+<div class="mini-glossary"><strong>PX + number</strong> = a Tobi/ACD intent code. Human label per code sits with the ACD team.</div>
+<div class="chart-wrap" style="height:360px;"><canvas id="chart6"></canvas></div>
+<div class="colour-legend">
+<span class="swatch"><span class="box" style="background:#e60000;"></span>≥ 99% misrouted (systemic)</span>
+<span class="swatch"><span class="box" style="background:#f4a8a8;"></span>89–95% misrouted (severe)</span>
 <span class="swatch"><span class="box" style="background:transparent;border:1px dashed #666;"></span>Overall 75.9%</span>
-<span class="swatch">Volume in brackets = # sessions in that family</span>
+<span class="swatch">(nnn) = # sessions in family</span>
 </div>
 <p class="footnote">Together these 8 families = <strong>~30% of the KPI universe</strong> and misroute at <strong>~95% on average</strong>. Fix these and the headline number drops dramatically.</p>
 <div class="footer"><span>Confidential — Internal</span><span>Slide 7 / 15</span></div>
@@ -227,11 +227,11 @@
 
 <!-- ================ SLIDE 8 : WHERE IT WORKS — comparison chart ================ -->
 <section>
-<div class="mini-glossary"><strong>PX + number</strong> = a Tobi/ACD intent code. Human label per code sits with the ACD team.</div>
 <div class="eyebrow">Where it works — routing infrastructure isn't broken</div>
 <h2>Well-routed families sit at 30 – 42%.</h2>
-<div class="chart-wrap" style="height:340px;"><canvas id="chart7"></canvas></div>
-<div class="colour-legend" style="margin-top:-.3em;">
+<div class="mini-glossary"><strong>PX + number</strong> = a Tobi/ACD intent code. Human label per code sits with the ACD team.</div>
+<div class="chart-wrap" style="height:300px;"><canvas id="chart7"></canvas></div>
+<div class="colour-legend">
 <span class="swatch"><span class="box" style="background:#0a8f3c;"></span>Green = well-routed (below overall average)</span>
 <span class="swatch"><span class="box" style="background:transparent;border:1px dashed #666;"></span>Overall 75.9%</span>
 </div>
@@ -247,7 +247,7 @@
 <div class="chart-wrap" style="height:320px;"><canvas id="chart8_pie"></canvas></div>
 <div class="chart-wrap" style="height:320px;"><canvas id="chart8_bar"></canvas></div>
 </div>
-<div class="colour-legend" style="justify-content:center;margin-top:.2em;">
+<div class="colour-legend" style="justify-content:center;">
 <span class="swatch"><span class="box" style="background:#e60000;"></span>Consumer</span>
 <span class="swatch"><span class="box" style="background:#f7a01d;"></span>Business</span>
 <span class="swatch"><span class="box" style="background:#666;"></span>Unknown segment</span>
@@ -262,7 +262,7 @@
 <div class="eyebrow">By channel — the descriptive "why"</div>
 <h2>Every channel misroutes at least 3 in 4 sessions.</h2>
 <div class="chart-wrap" style="height:340px;"><canvas id="chart9"></canvas></div>
-<div class="colour-legend" style="justify-content:center;margin-top:-.2em;">
+<div class="colour-legend" style="justify-content:center;">
 <span class="swatch"><span class="box" style="background:#0b78d1;"></span>Best-performing channel (below overall)</span>
 <span class="swatch"><span class="box" style="background:#f4a8a8;"></span>Around overall (76–79%)</span>
 <span class="swatch"><span class="box" style="background:#e60000;"></span>Worst-performing (≥ 80%)</span>
@@ -378,9 +378,12 @@ const targetLine = (yVal, label='target') => ({
       ctx.moveTo(left,pos);ctx.lineTo(right,pos);
     }
     ctx.stroke();
-    ctx.setLineDash([]);ctx.fillStyle='#333';ctx.font='bold 11px sans-serif';
+    ctx.setLineDash([]);ctx.fillStyle='#333';ctx.font='bold 10px sans-serif';
     if(chart.options.indexAxis === 'y'){
-      ctx.fillText(label+' '+yVal+'%',pos+4,chart.chartArea.top+12);
+      // draw label ABOVE the plot area so it never overlaps bars
+      ctx.textAlign='center';
+      ctx.fillText(label+' '+yVal+'%',pos,chart.chartArea.top-4);
+      ctx.textAlign='left';
     } else {
       ctx.fillText(label+' '+yVal+'%',left+8,pos-4);
     }
@@ -417,6 +420,7 @@ function renderCharts(){
       },
       options:{
         responsive:true,maintainAspectRatio:false,indexAxis:'y',
+        layout:{padding:{top:18}},
         scales:{
           x:{beginAtZero:true,max:105,ticks:{callback:v=>v+'%'},title:{display:true,text:'Misroute rate range (%)'}},
           y:{ticks:{font:{size:12,weight:'600'}}}
@@ -447,6 +451,7 @@ function renderCharts(){
       },
       options:{
         responsive:true,maintainAspectRatio:false,indexAxis:'y',
+        layout:{padding:{top:18,right:110}},
         scales:{
           x:{beginAtZero:true,max:105,ticks:{callback:v=>v+'%'},title:{display:true,text:'Misroute rate (%)'}},
           y:{ticks:{font:{size:14,weight:'700'}}}
@@ -482,6 +487,7 @@ function renderCharts(){
       },
       options:{
         responsive:true,maintainAspectRatio:false,indexAxis:'y',
+        layout:{padding:{top:18,right:120}},
         scales:{
           x:{beginAtZero:true,max:105,ticks:{callback:v=>v+'%'},title:{display:true,text:'Misroute rate (%)'}},
           y:{ticks:{font:{size:16,weight:'700'}}}
@@ -557,6 +563,7 @@ function renderCharts(){
       },
       options:{
         responsive:true,maintainAspectRatio:false,
+        layout:{padding:{top:22}},
         scales:{
           y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'},title:{display:true,text:'Misroute rate (%)'}},
           x:{ticks:{font:{size:13,weight:'700'}}}
