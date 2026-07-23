@@ -176,13 +176,9 @@
 <!-- ================ SLIDE 9 : BY CHANNEL — placeholder + chart ================ -->
 <section>
 <div class="eyebrow">By channel — the descriptive "why"</div>
-<h2>Where does misrouting concentrate by contact channel?</h2>
-<div class="placeholder-note">
-<strong>⚠ Placeholder data — replace with your Block F output.</strong><br>
-Run Block F in <code>sql/10_misrouting_why_analysis.sql</code>, then update the values in this slide's chart. Numbers below are illustrative only.
-</div>
-<div class="chart-wrap" style="height:340px;"><canvas id="chart9"></canvas></div>
-<p class="footnote">If channel rates differ by more than 5 percentage points, that points at a channel-specific classification weakness. If they're flat, misrouting is channel-agnostic — reinforcing the "taxonomy problem" story.</p>
+<h2>Every channel misroutes at least 3 in 4 sessions.</h2>
+<div class="chart-wrap" style="height:360px;"><canvas id="chart9"></canvas></div>
+<div class="callout"><div class="label">The insight</div><p><strong>App is the best-performing channel at 73%</strong>, Web at 78%, and the partner channels (amigo_web, amigo_app) sit between 75% and 83%. Even the best channel is misrouting three in four sessions — reinforcing that the problem is <strong>intent-classification, not channel-specific</strong>.</p></div>
 <div class="footer"><span>Confidential — Internal</span><span>Slide 9 / 14</span></div>
 </section>
 
@@ -430,23 +426,43 @@ function renderCharts(){
     });
   }
 
-  // --- Slide 9 — CHANNEL PLACEHOLDER (illustrative data — replace with Block F output) ---
+  // --- Slide 9 — CHANNEL (real data from Block F) ---
   if(document.getElementById('chart9') && !window._c9){
     window._c9 = new Chart(document.getElementById('chart9'),{
       type:'bar',
       data:{
-        labels:['Voice','WhatsApp','Web Chat','App','Unknown'],
-        datasets:[{label:'Misroute rate (%)',data:[76.0,74.0,78.0,73.0,82.0],backgroundColor:info,borderWidth:2,borderColor:'#fff'}]
+        labels:['Web','App','amigo_app','amigo_web'],
+        datasets:[{
+          label:'Misroute rate (%)',
+          data:[77.59,73.34,75.29,83.22],
+          backgroundColor:(ctx)=>{
+            const v = ctx.raw;
+            return v >= 80 ? brand : v >= 76 ? '#f4a8a8' : info;
+          },
+          borderWidth:2,borderColor:'#fff'
+        }]
       },
       options:{
         responsive:true,maintainAspectRatio:false,
-        scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}}},
+        scales:{
+          y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'},title:{display:true,text:'Misroute rate (%)'}},
+          x:{ticks:{font:{size:13,weight:'700'}}}
+        },
         plugins:{legend:{display:false},
-          title:{display:true,text:'⚠ ILLUSTRATIVE — replace with Block F output',font:{size:13,weight:'700'},color:warn},
-          tooltip:{callbacks:{label:(t)=>t.raw+'% (placeholder)'}}
+          title:{display:true,text:'Misroute rate by channel — n = 310,146 sessions',font:{size:13,weight:'700'}},
+          tooltip:{callbacks:{label:(t)=>t.raw+'% misrouted'}}
         }
       },
-      plugins:[targetLine(75.9,'overall')]
+      plugins:[targetLine(75.9,'overall'),{
+        id:'volLabels9',afterDatasetsDraw(chart){
+          const meta = chart.getDatasetMeta(0);
+          const vols = ['163,534','129,945','8,364','8,303'];
+          const ctx = chart.ctx;
+          ctx.save();ctx.font='11px sans-serif';ctx.fillStyle='#333';ctx.textAlign='center';
+          meta.data.forEach((bar,i)=>{ctx.fillText(vols[i]+' sessions',bar.x,bar.y-8);});
+          ctx.restore();
+        }
+      }]
     });
   }
 }
